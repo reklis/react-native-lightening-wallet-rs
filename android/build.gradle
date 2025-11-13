@@ -13,9 +13,9 @@ buildscript {
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
 
 android {
+    namespace 'com.reactnativelighteningwallet'
     compileSdkVersion 33
 
     defaultConfig {
@@ -37,17 +37,13 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = '11'
-    }
-
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
         }
     }
 
-    ndkVersion "25.1.8937393"
+    ndkVersion "29.0.14033849"
 }
 
 repositories {
@@ -57,7 +53,8 @@ repositories {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    implementation 'com.facebook.react:react-native:+'
+    // React Native will be provided by the consuming app
+    // compileOnly 'com.facebook.react:react-native:+'
 }
 
 // Task to build Rust library

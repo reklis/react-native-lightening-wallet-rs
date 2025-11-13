@@ -18,6 +18,9 @@ pub struct LightningNode {
     storage_path: Arc<Mutex<Option<PathBuf>>>,
 }
 
+// Note: Many methods are currently unused but are part of the public API
+// that will be exposed to React Native for Lightning functionality
+#[allow(dead_code)]
 impl LightningNode {
     pub fn new() -> Self {
         LightningNode {
@@ -59,7 +62,7 @@ impl LightningNode {
         }
 
         // Set up listening address
-        builder.set_listening_addresses(vec![
+        let _ = builder.set_listening_addresses(vec![
             SocketAddress::TcpIpV4 {
                 addr: [0, 0, 0, 0],
                 port: 9735,

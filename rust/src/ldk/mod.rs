@@ -3,6 +3,8 @@ mod channels;
 mod invoices;
 mod payments;
 mod peers;
+
+#[allow(dead_code)]
 pub mod podcasting;
 
 pub use node::LightningNode;
@@ -10,11 +12,11 @@ pub use channels::{ChannelInfo, OpenChannelParams, CloseChannelParams};
 pub use invoices::{InvoiceInfo, CreateInvoiceParams};
 pub use payments::{PaymentInfo, PayInvoiceParams, KeysendParams, SendOnChainParams};
 pub use peers::{PeerInfo, ConnectPeerParams};
-pub use podcasting::{Podcasting20Builder, tlv_types};
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum LightningError {
     #[error("Not initialized")]
     NotInitialized,

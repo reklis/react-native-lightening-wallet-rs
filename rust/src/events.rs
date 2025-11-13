@@ -66,16 +66,7 @@ impl EventEmitter {
         }
     }
 
-    pub fn emit(&self, event: WalletEvent) {
-        // If the channel is full, drop the oldest event
-        let _ = self.sender.try_send(event);
-    }
-
-    pub fn get_receiver(&self) -> Arc<Mutex<Receiver<WalletEvent>>> {
-        Arc::clone(&self.receiver)
-    }
-
-    pub fn try_recv(&self) -> Option<WalletEvent> {
+    fn try_recv(&self) -> Option<WalletEvent> {
         if let Ok(receiver) = self.receiver.lock() {
             receiver.try_recv().ok()
         } else {
@@ -108,28 +99,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_event_emission() {
+    fn test_event_emitter_creation() {
         let emitter = EventEmitter::new(100);
-
-        emitter.emit(WalletEvent::SyncStarted);
-        emitter.emit(WalletEvent::SyncCompleted { duration_ms: 1000 });
-
         let events = emitter.drain_events();
-        assert_eq!(events.len(), 2);
-    }
-
-    #[test]
-    fn test_event_types() {
-        let emitter = EventEmitter::new(100);
-
-        emitter.emit(WalletEvent::BalanceUpdated {
-            onchain_confirmed: 100000,
-            onchain_unconfirmed: 50000,
-            lightning_balance: 200000,
-            total: 300000,
-        });
-
-        let event = emitter.try_recv();
-        assert!(event.is_some());
+        assert_eq!(events.len(), 0);
     }
 }

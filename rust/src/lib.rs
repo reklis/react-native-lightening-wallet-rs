@@ -204,7 +204,7 @@ pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_na
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeGenerateMnemonic(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _: JClass,
 ) -> jstring {
     let result = generate_mnemonic_impl();

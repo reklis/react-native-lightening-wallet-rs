@@ -1,4 +1,6 @@
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
+#[cfg(test)]
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -8,10 +10,6 @@ use thiserror::Error;
 pub enum DatabaseError {
     #[error("SQLite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
-    #[error("Not found: {0}")]
-    NotFound(String),
-    #[error("Serialization error: {0}")]
-    Serialization(String),
     #[error("Lock error: {0}")]
     Lock(String),
 }
@@ -49,6 +47,7 @@ impl Database {
         Ok(db)
     }
 
+    #[cfg(test)]
     pub fn in_memory() -> Result<Self, DatabaseError> {
         let conn = Connection::open_in_memory()?;
 
@@ -102,6 +101,7 @@ impl Database {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn insert_payment(&self, payment: &Payment) -> Result<i64, DatabaseError> {
         let conn = self.conn.lock()
             .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
@@ -129,23 +129,7 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn update_payment_status(
-        &self,
-        payment_hash: &str,
-        status: &str,
-        preimage: Option<&str>,
-    ) -> Result<(), DatabaseError> {
-        let conn = self.conn.lock()
-            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
-
-        conn.execute(
-            "UPDATE payments SET status = ?1, preimage = ?2 WHERE payment_hash = ?3",
-            params![status, preimage, payment_hash],
-        )?;
-
-        Ok(())
-    }
-
+    #[cfg(test)]
     pub fn get_payment(&self, payment_hash: &str) -> Result<Payment, DatabaseError> {
         let conn = self.conn.lock()
             .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
@@ -224,72 +208,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn list_payments_by_type(
-        &self,
-        payment_type: &str,
-        limit: Option<usize>,
-    ) -> Result<Vec<Payment>, DatabaseError> {
-        let conn = self.conn.lock()
-            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
-
-        let mut query = String::from(
-            "SELECT id, payment_hash, payment_type, amount_sats, fee_sats, status,
-                    timestamp, description, destination, txid, preimage, bolt11
-             FROM payments WHERE payment_type = ?1 ORDER BY timestamp DESC"
-        );
-
-        if let Some(limit) = limit {
-            query.push_str(&format!(" LIMIT {}", limit));
-        }
-
-        let mut stmt = conn.prepare(&query)?;
-
-        let payments = stmt.query_map(params![payment_type], |row| {
-            Ok(Payment {
-                id: row.get(0)?,
-                payment_hash: row.get(1)?,
-                payment_type: row.get(2)?,
-                amount_sats: row.get(3)?,
-                fee_sats: row.get(4)?,
-                status: row.get(5)?,
-                timestamp: row.get(6)?,
-                description: row.get(7)?,
-                destination: row.get(8)?,
-                txid: row.get(9)?,
-                preimage: row.get(10)?,
-                bolt11: row.get(11)?,
-            })
-        })?;
-
-        let mut result = Vec::new();
-        for payment in payments {
-            result.push(payment?);
-        }
-
-        Ok(result)
-    }
-
-    pub fn delete_payment(&self, payment_hash: &str) -> Result<(), DatabaseError> {
-        let conn = self.conn.lock()
-            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
-
-        conn.execute(
-            "DELETE FROM payments WHERE payment_hash = ?1",
-            params![payment_hash],
-        )?;
-
-        Ok(())
-    }
-
-    pub fn clear_all_payments(&self) -> Result<(), DatabaseError> {
-        let conn = self.conn.lock()
-            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
-
-        conn.execute("DELETE FROM payments", [])?;
-
-        Ok(())
-    }
-
+    #[cfg(test)]
     pub fn get_payment_count(&self) -> Result<usize, DatabaseError> {
         let conn = self.conn.lock()
             .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;

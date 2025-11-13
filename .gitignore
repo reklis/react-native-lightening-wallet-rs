@@ -1,2 +1,5 @@
 rust/target
 node_modules
+android/build
+android/.gradle
+android/src/main/jniLibs

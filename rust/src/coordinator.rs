@@ -9,8 +9,6 @@ use crate::ldk::LightningNode;
 
 #[derive(Debug, Error)]
 pub enum CoordinatorError {
-    #[error("Not initialized")]
-    NotInitialized,
     #[error("Already initialized")]
     AlreadyInitialized,
     #[error("Key error: {0}")]
