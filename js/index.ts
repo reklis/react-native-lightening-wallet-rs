@@ -6,8 +6,11 @@ const LINKING_ERROR =
   '- You rebuilt the app after installing the package\n' +
   '- You are not using Expo Go\n';
 
-const LighteningWallet = NativeModules.LighteningWalletModule
-  ? NativeModules.LighteningWalletModule
+// Module name is different on iOS vs Android
+const moduleName = Platform.OS === 'ios' ? 'LighteningWallet' : 'LighteningWalletModule';
+
+const LighteningWallet = NativeModules[moduleName]
+  ? NativeModules[moduleName]
   : new Proxy(
       {},
       {
@@ -90,7 +93,8 @@ export class LighteningWalletAPI {
     network: 'bitcoin' | 'testnet',
     dbPath: string
   ): Promise<{ userId: string; initialized: boolean }> {
-    const result = await LighteningWallet.nativeInitialize(
+    const methodName = Platform.OS === 'ios' ? 'initialize' : 'nativeInitialize';
+    const result = await LighteningWallet[methodName](
       userId,
       mnemonic,
       network,
@@ -105,7 +109,8 @@ export class LighteningWalletAPI {
    * Generate a new BIP39 mnemonic phrase
    */
   static async generateMnemonic(): Promise<string> {
-    const result = await LighteningWallet.nativeGenerateMnemonic();
+    const methodName = Platform.OS === 'ios' ? 'generateMnemonic' : 'nativeGenerateMnemonic';
+    const result = await LighteningWallet[methodName]();
     const data = parseResponse<{ mnemonic: string }>(result);
     return data.mnemonic;
   }
@@ -117,7 +122,8 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const result = await LighteningWallet.nativeGetBalance(this.userId);
+    const methodName = Platform.OS === 'ios' ? 'getBalance' : 'nativeGetBalance';
+    const result = await LighteningWallet[methodName](this.userId);
     return parseResponse<WalletBalance>(result);
   }
 
@@ -128,7 +134,8 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const result = await LighteningWallet.nativeSyncWallet(this.userId);
+    const methodName = Platform.OS === 'ios' ? 'syncWallet' : 'nativeSyncWallet';
+    const result = await LighteningWallet[methodName](this.userId);
     return parseResponse<{ synced: boolean }>(result);
   }
 
@@ -139,7 +146,8 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const result = await LighteningWallet.nativeGetReceivingAddress(this.userId);
+    const methodName = Platform.OS === 'ios' ? 'getReceivingAddress' : 'nativeGetReceivingAddress';
+    const result = await LighteningWallet[methodName](this.userId);
     const data = parseResponse<{ address: string }>(result);
     return data.address;
   }
@@ -151,7 +159,8 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const result = await LighteningWallet.nativeListPayments(
+    const methodName = Platform.OS === 'ios' ? 'listPayments' : 'nativeListPayments';
+    const result = await LighteningWallet[methodName](
       this.userId,
       limit || 0,
       offset || 0
@@ -166,7 +175,8 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const result = await LighteningWallet.nativeGetEvents(this.userId);
+    const methodName = Platform.OS === 'ios' ? 'getEvents' : 'nativeGetEvents';
+    const result = await LighteningWallet[methodName](this.userId);
     return parseResponse<WalletEvent[]>(result);
   }
 
@@ -188,7 +198,8 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const result = await LighteningWallet.nativeDisconnect(this.userId);
+    const methodName = Platform.OS === 'ios' ? 'disconnect' : 'nativeDisconnect';
+    const result = await LighteningWallet[methodName](this.userId);
     const data = parseResponse<{ disconnected: boolean }>(result);
     this.userId = null;
     return data;
