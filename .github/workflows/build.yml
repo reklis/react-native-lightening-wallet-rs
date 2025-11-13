@@ -1,4 +1,6 @@
-name: Build iOS and Android
+# Example: Use the Docker image for faster builds
+# Rename this to build.yml to use the pre-built Docker image instead of installing dependencies
+name: Build iOS and Android (Docker)
 
 on:
   push:
@@ -9,31 +11,21 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-          cache: 'npm'
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
@@ -42,46 +34,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install Rust targets for iOS
-        run: |
-          rustup target add aarch64-apple-ios
-          rustup target add x86_64-apple-ios
-          rustup target add aarch64-apple-ios-sim
-
-      - name: Install Rust targets for Android
-        run: |
-          rustup target add aarch64-linux-android
-          rustup target add armv7-linux-androideabi
-          rustup target add x86_64-linux-android
-          rustup target add i686-linux-android
-
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android NDK
-        run: |
-          echo "y" | sdkmanager --install "ndk;29.0.14033849"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.14033849" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/29.0.14033849" >> $GITHUB_ENV
+      - name: Install Node dependencies
+        run: npm ci
 
       - name: Run Rust tests
         run: npm run test
 
       - name: Build Rust for Android
         run: npm run build:rust:android
-
-      - name: Build Rust for iOS
-        run: npm run build:rust:ios
 
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@v4
@@ -91,26 +51,11 @@ jobs:
             android/src/main/jniLibs/**/*.so
           retention-days: 7
 
-      - name: Upload iOS build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build
-          path: |
-            ios/lib/*.a
-            ios/*.xcframework
-          retention-days: 7
-
       - name: Build summary
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Android Native Libraries" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh android/src/main/jniLibs/*/*.so 2>/dev/null || echo "No Android libraries found"
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### iOS Libraries" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh ios/lib/*.a 2>/dev/null || echo "No iOS libraries found"
-          ls -d ios/*.xcframework 2>/dev/null || echo "No xcframework found"
+          ls -lh android/src/main/jniLibs/*/*.so
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

@@ -1,4 +1,4 @@
-FROM rust:1.83-slim
+FROM rust:1.86-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -45,12 +45,18 @@ RUN yes | sdkmanager --licenses && \
     "build-tools;33.0.2" && \
     rm -rf ${ANDROID_HOME}/.android
 
-# Install Rust Android targets
+# Install Rust targets for Android
 RUN rustup target add \
     aarch64-linux-android \
     armv7-linux-androideabi \
     x86_64-linux-android \
     i686-linux-android
+
+# Install Rust targets for iOS
+RUN rustup target add \
+    aarch64-apple-ios \
+    x86_64-apple-ios \
+    aarch64-apple-ios-sim
 
 # Install cargo-ndk
 RUN cargo install cargo-ndk
