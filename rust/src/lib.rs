@@ -1,4 +1,3 @@
-mod electrum;
 mod wallet;
 mod storage;
 mod events;
@@ -85,13 +84,22 @@ fn generate_mnemonic_impl() -> String {
     Response::success(json!({ "mnemonic": mnemonic }))
 }
 
-// Get balance
+// Get balance (using LDK-node's balance API)
 fn get_balance_impl(user_id: String) -> String {
     let wallets = WALLETS.lock().unwrap();
 
     if let Some(coordinator) = wallets.get(&user_id) {
-        match coordinator.get_balance() {
-            Ok(balance) => Response::success(serde_json::to_value(balance).unwrap()),
+        let lightning_node = coordinator.get_lightning_node();
+        match lightning_node.get_total_onchain_balance() {
+            Ok(onchain_balance) => {
+                let balances = json!({
+                    "onchain_confirmed": onchain_balance,
+                    "onchain_unconfirmed": 0, // LDK doesn't expose this separately
+                    "lightning_balance": 0, // TODO: Calculate from channels
+                    "total": onchain_balance
+                });
+                Response::success(balances)
+            }
             Err(e) => Response::error(format!("Failed to get balance: {}", e)),
         }
     } else {
@@ -113,12 +121,13 @@ fn sync_wallet_impl(user_id: String) -> String {
     }
 }
 
-// Get receiving address
+// Get receiving address (using LDK-node's onchain wallet)
 fn get_receiving_address_impl(user_id: String) -> String {
     let wallets = WALLETS.lock().unwrap();
 
     if let Some(coordinator) = wallets.get(&user_id) {
-        match coordinator.get_receiving_address() {
+        let lightning_node = coordinator.get_lightning_node();
+        match lightning_node.get_onchain_address() {
             Ok(address) => Response::success(json!({ "address": address })),
             Err(e) => Response::error(format!("Failed to get address: {}", e)),
         }

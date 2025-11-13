@@ -373,8 +373,24 @@ impl LightningNode {
             .map_err(|e| LightningError::PaymentError(format!("Invalid pubkey: {}", e)))?;
 
         let amount_msat = params.amount_sats * 1000;
-        let payment_id = node.spontaneous_payment().send(amount_msat, pubkey, None)
-            .map_err(|e| LightningError::PaymentError(format!("Keysend failed: {:?}", e)))?;
+
+        // Use send_with_custom_tlvs if custom records are provided (for Podcasting 2.0)
+        let payment_id = if params.custom_records.is_empty() {
+            node.spontaneous_payment().send(amount_msat, pubkey, None)
+                .map_err(|e| LightningError::PaymentError(format!("Keysend failed: {:?}", e)))?
+        } else {
+            // Convert HashMap to Vec<CustomTlvRecord>
+            let custom_tlvs: Vec<ldk_node::CustomTlvRecord> = params.custom_records
+                .into_iter()
+                .map(|(type_id, data)| ldk_node::CustomTlvRecord {
+                    type_num: type_id,
+                    value: data,
+                })
+                .collect();
+
+            node.spontaneous_payment().send_with_custom_tlvs(amount_msat, pubkey, None, custom_tlvs)
+                .map_err(|e| LightningError::PaymentError(format!("Keysend with custom TLVs failed: {:?}", e)))?
+        };
 
         Ok(PaymentInfo {
             payment_hash: hex::encode(payment_id.0),
