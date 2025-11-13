@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use bitcoin::Address;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

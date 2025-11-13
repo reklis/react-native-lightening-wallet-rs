@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex};
-use bitcoin::Network;
+use bitcoin::Network as BitcoinNetwork;
 use thiserror::Error;
 
 use crate::wallet::{KeyManager, UtxoManager, AddressManager, BalanceManager, WalletBalance};
 use crate::electrum::{ElectrumClient, get_default_peers};
 use crate::storage::Database;
 use crate::events::{EventEmitter, WalletEvent};
-use crate::ldk::{LightningNode, LightningError};
+use crate::ldk::LightningNode;
 
 #[derive(Debug, Error)]
 pub enum CoordinatorError {
@@ -35,7 +35,7 @@ pub struct WalletCoordinator {
     lightning_node: Arc<LightningNode>,
     database: Arc<Database>,
     event_emitter: Arc<EventEmitter>,
-    network: Arc<Mutex<Option<Network>>>,
+    network: Arc<Mutex<Option<BitcoinNetwork>>>,
     storage_path: String,
 }
 
@@ -68,7 +68,7 @@ impl WalletCoordinator {
     pub fn initialize(
         &self,
         mnemonic: &str,
-        network: Network,
+        network: BitcoinNetwork,
     ) -> Result<(), CoordinatorError> {
         // Check if already initialized
         {
@@ -108,9 +108,17 @@ impl WalletCoordinator {
 
         // Initialize Lightning node
         let lightning_storage = format!("{}/lightning", self.storage_path);
+        // Convert bitcoin::Network to ldk_node::bitcoin::Network
+        let ldk_network = match network {
+            BitcoinNetwork::Bitcoin => ldk_node::bitcoin::Network::Bitcoin,
+            BitcoinNetwork::Testnet => ldk_node::bitcoin::Network::Testnet,
+            BitcoinNetwork::Signet => ldk_node::bitcoin::Network::Signet,
+            BitcoinNetwork::Regtest => ldk_node::bitcoin::Network::Regtest,
+            _ => return Err(CoordinatorError::LightningError("Unsupported network".to_string())),
+        };
         self.lightning_node.initialize(
             lightning_seed,
-            network,
+            ldk_network,
             &lightning_storage,
             None, // Will set Esplora server later
         ).map_err(|e| CoordinatorError::LightningError(format!("{}", e)))?;
@@ -122,10 +130,10 @@ impl WalletCoordinator {
         Ok(())
     }
 
-    fn connect_electrum(&self, network: Network) -> Result<(), CoordinatorError> {
+    fn connect_electrum(&self, network: BitcoinNetwork) -> Result<(), CoordinatorError> {
         let network_str = match network {
-            Network::Bitcoin => "bitcoin",
-            Network::Testnet => "testnet",
+            BitcoinNetwork::Bitcoin => "bitcoin",
+            BitcoinNetwork::Testnet => "testnet",
             _ => return Err(CoordinatorError::ElectrumError("Unsupported network".to_string())),
         };
 

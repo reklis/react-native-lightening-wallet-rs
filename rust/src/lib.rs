@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use coordinator::WalletCoordinator;
-use events::WalletEvent;
 
 #[cfg(target_os = "android")]
 use jni::JNIEnv;

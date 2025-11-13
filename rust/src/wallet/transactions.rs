@@ -105,7 +105,7 @@ impl TransactionBuilder {
             .collect();
 
         // Create unsigned transaction
-        let mut tx = Transaction {
+        let tx = Transaction {
             version: bitcoin::transaction::Version(2),
             lock_time: bitcoin::absolute::LockTime::ZERO,
             input: tx_inputs,

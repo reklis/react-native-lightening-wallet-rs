@@ -1,4 +1,4 @@
-use rusqlite::{Connection, params, Result as SqlResult};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};

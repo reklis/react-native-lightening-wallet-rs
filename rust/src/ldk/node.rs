@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use std::str::FromStr;
-use bitcoin::Network;
-use ldk_node::{Builder, Node as LdkNode, Config, NetAddress};
+use ldk_node::{Builder, Node as LdkNode};
+use ldk_node::bitcoin::{Network, Address as BdkAddress};
 use ldk_node::bitcoin::secp256k1::PublicKey;
 use ldk_node::lightning::ln::msgs::SocketAddress;
-use ldk_node::lightning_invoice::Bolt11Invoice;
+use ldk_node::lightning_invoice::{Bolt11Invoice, Description};
 
 use super::{LightningError, ChannelInfo, OpenChannelParams, CloseChannelParams};
 use super::{InvoiceInfo, CreateInvoiceParams};
@@ -41,30 +41,30 @@ impl LightningNode {
             return Err(LightningError::AlreadyInitialized);
         }
 
-        // Create ldk-node config
-        let mut config = Config::default();
-        config.network = network;
-        config.storage_dir_path = PathBuf::from(storage_path);
+        // Expand 32-byte entropy to 64 bytes by repeating it
+        // Note: For production, consider using a KDF to derive 64 bytes properly
+        let mut entropy_64 = [0u8; 64];
+        entropy_64[..32].copy_from_slice(&entropy);
+        entropy_64[32..].copy_from_slice(&entropy);
+
+        // Build the node using Builder methods
+        let mut builder = Builder::new();
+        builder.set_network(network);
+        builder.set_storage_dir_path(storage_path.to_string());
+        builder.set_entropy_seed_bytes(entropy_64);
+
+        // Set Esplora server for chain data
+        if let Some(esplora_url) = esplora_server {
+            builder.set_chain_source_esplora(esplora_url.to_string(), None);
+        }
 
         // Set up listening address
-        config.listening_addresses = Some(vec![
+        builder.set_listening_addresses(vec![
             SocketAddress::TcpIpV4 {
                 addr: [0, 0, 0, 0],
                 port: 9735,
             }
         ]);
-
-        // Build the node
-        let mut builder = Builder::from_config(config);
-
-        // Set entropy for key generation
-        builder.set_entropy_seed_bytes(entropy)
-            .map_err(|e| LightningError::LdkError(format!("Failed to set entropy: {:?}", e)))?;
-
-        // Set Esplora server for chain data
-        if let Some(esplora_url) = esplora_server {
-            builder.set_esplora_server(esplora_url.to_string());
-        }
 
         // Build the node
         let node = builder.build()
@@ -143,10 +143,10 @@ impl LightningNode {
         let pubkey = PublicKey::from_str(&params.node_id)
             .map_err(|e| LightningError::PeerError(format!("Invalid pubkey: {}", e)))?;
 
-        let net_address = NetAddress::from_str(&format!("{}:{}", params.address, params.port))
+        let socket_address = SocketAddress::from_str(&format!("{}:{}", params.address, params.port))
             .map_err(|e| LightningError::PeerError(format!("Invalid address: {}", e)))?;
 
-        node.connect(pubkey, net_address, true)
+        node.connect(pubkey, socket_address, true)
             .map_err(|e| LightningError::PeerError(format!("Failed to connect: {:?}", e)))?;
 
         Ok(())
@@ -180,7 +180,7 @@ impl LightningNode {
         let peers: Vec<PeerInfo> = peer_details.iter().map(|peer| {
             PeerInfo {
                 node_id: peer.node_id.to_string(),
-                address: peer.address.as_ref().map(|addr| format!("{:?}", addr)),
+                address: Some(format!("{:?}", peer.address)),
                 port: None, // ldk-node doesn't expose port separately
                 is_connected: peer.is_connected,
             }
@@ -200,24 +200,26 @@ impl LightningNode {
         let pubkey = PublicKey::from_str(&params.counterparty_node_id)
             .map_err(|e| LightningError::ChannelError(format!("Invalid pubkey: {}", e)))?;
 
-        // Connect to peer first if address is provided
-        if let (Some(address), Some(port)) = (params.peer_address, params.peer_port) {
-            let net_address = NetAddress::from_str(&format!("{}:{}", address, port))
-                .map_err(|e| LightningError::ChannelError(format!("Invalid address: {}", e)))?;
+        // Prepare socket address if provided
+        let socket_address = if let (Some(address), Some(port)) = (params.peer_address, params.peer_port) {
+            SocketAddress::from_str(&format!("{}:{}", address, port))
+                .map_err(|e| LightningError::ChannelError(format!("Invalid address: {}", e)))?
+        } else {
+            // If no address provided, we need one for open_channel - use a default that will fail gracefully
+            return Err(LightningError::ChannelError("Peer address and port required to open channel".to_string()));
+        };
 
-            node.connect(pubkey, net_address, true)
-                .map_err(|e| LightningError::ChannelError(format!("Failed to connect: {:?}", e)))?;
-        }
-
-        // Open channel
+        // Open channel - new signature: open_channel(pubkey, address, amount_sats, push_msat, config)
         let user_channel_id = node.open_channel(
             pubkey,
+            socket_address,
             params.channel_value_satoshis,
             Some(params.push_msat),
-            None, // announce_channel (use default)
+            None, // channel_config (use default)
         ).map_err(|e| LightningError::ChannelError(format!("Failed to open channel: {:?}", e)))?;
 
-        Ok(format!("{:x}", user_channel_id))
+        // Convert UserChannelId to hex string
+        Ok(hex::encode(user_channel_id.0.to_le_bytes()))
     }
 
     pub fn close_channel(&self, params: CloseChannelParams) -> Result<(), LightningError> {
@@ -227,9 +229,17 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
-        // Parse channel_id as user_channel_id (hex string to u128)
-        let user_channel_id = u128::from_str_radix(&params.channel_id, 16)
-            .map_err(|e| LightningError::ChannelError(format!("Invalid channel ID: {}", e)))?;
+        // Parse channel_id as user_channel_id (hex bytes to u128)
+        let channel_id_bytes = hex::decode(&params.channel_id)
+            .map_err(|e| LightningError::ChannelError(format!("Invalid channel ID hex: {}", e)))?;
+
+        if channel_id_bytes.len() != 16 {
+            return Err(LightningError::ChannelError("Channel ID must be 16 bytes".to_string()));
+        }
+
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&channel_id_bytes);
+        let user_channel_id = ldk_node::UserChannelId(u128::from_le_bytes(bytes));
 
         // Get counterparty pubkey from channel list
         let channels = node.list_channels();
@@ -240,10 +250,10 @@ impl LightningNode {
         let counterparty_pubkey = channel.counterparty_node_id;
 
         if params.force {
-            node.force_close_channel(&channel.channel_id, counterparty_pubkey)
+            node.force_close_channel(&user_channel_id, counterparty_pubkey, Some("User requested force close".to_string()))
                 .map_err(|e| LightningError::ChannelError(format!("Failed to force close: {:?}", e)))?;
         } else {
-            node.close_channel(&channel.channel_id, counterparty_pubkey)
+            node.close_channel(&user_channel_id, counterparty_pubkey)
                 .map_err(|e| LightningError::ChannelError(format!("Failed to close: {:?}", e)))?;
         }
 
@@ -268,7 +278,7 @@ impl LightningNode {
                 outbound_capacity_sats: channel.outbound_capacity_msat / 1000,
                 inbound_capacity_sats: channel.inbound_capacity_msat / 1000,
                 is_usable: channel.is_channel_ready && channel.is_usable,
-                is_public: channel.is_public,
+                is_public: channel.is_announced,
                 is_ready: channel.is_channel_ready,
                 is_closing: false, // ldk-node doesn't expose this directly
                 confirmations_required: channel.confirmations_required,
@@ -286,22 +296,33 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
-        let invoice = node.receive_payment(
-            params.amount_sats.unwrap_or(0),
-            params.description.as_deref().unwrap_or(""),
-            params.expiry_secs,
-        ).map_err(|e| LightningError::InvoiceError(format!("Failed to create invoice: {:?}", e)))?;
+        let desc_str = params.description.clone().unwrap_or_default();
+        let description = Description::new(desc_str)
+            .map_err(|e| LightningError::InvoiceError(format!("Invalid description: {:?}", e)))?;
 
-        let parsed_invoice = Bolt11Invoice::from_str(&invoice.to_string())
-            .map_err(|e| LightningError::InvoiceError(format!("Failed to parse invoice: {}", e)))?;
+        let invoice = if let Some(amount_sats) = params.amount_sats {
+            let amount_msat = amount_sats * 1000;
+            let desc_ref = ldk_node::lightning_invoice::Bolt11InvoiceDescription::Direct(description.clone());
+            node.bolt11_payment().receive(amount_msat, &desc_ref, params.expiry_secs)
+                .map_err(|e| LightningError::InvoiceError(format!("Failed to create invoice: {:?}", e)))?
+        } else {
+            // Variable amount invoice
+            let desc_ref = ldk_node::lightning_invoice::Bolt11InvoiceDescription::Direct(description.clone());
+            node.bolt11_payment().receive_variable_amount(&desc_ref, params.expiry_secs)
+                .map_err(|e| LightningError::InvoiceError(format!("Failed to create variable invoice: {:?}", e)))?
+        };
+
+        let timestamp = invoice.timestamp().duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| LightningError::InvoiceError(format!("Invalid timestamp: {}", e)))?
+            .as_secs();
 
         Ok(InvoiceInfo {
             bolt11: invoice.to_string(),
-            payment_hash: hex::encode(parsed_invoice.payment_hash().as_ref()),
+            payment_hash: hex::encode(invoice.payment_hash().as_ref() as &[u8]),
             amount_sats: params.amount_sats,
             description: params.description,
-            created_at: parsed_invoice.timestamp().as_secs(),
-            expires_at: parsed_invoice.timestamp().as_secs() + params.expiry_secs as u64,
+            created_at: timestamp,
+            expires_at: timestamp + params.expiry_secs as u64,
         })
     }
 
@@ -316,8 +337,13 @@ impl LightningNode {
         let invoice = Bolt11Invoice::from_str(&params.bolt11)
             .map_err(|e| LightningError::PaymentError(format!("Invalid invoice: {}", e)))?;
 
-        let payment_id = node.send_payment(&invoice)
+        let payment_id = node.bolt11_payment().send(&invoice, None)
             .map_err(|e| LightningError::PaymentError(format!("Payment failed: {:?}", e)))?;
+
+        let description_str = match invoice.description() {
+            ldk_node::lightning_invoice::Bolt11InvoiceDescriptionRef::Direct(desc) => Some(desc.to_string()),
+            ldk_node::lightning_invoice::Bolt11InvoiceDescriptionRef::Hash(_) => None,
+        };
 
         Ok(PaymentInfo {
             payment_hash: hex::encode(payment_id.0),
@@ -329,8 +355,8 @@ impl LightningNode {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            description: invoice.description().map(|d| d.to_string()),
-            destination: invoice.recover_payee_pub_key().map(|pk| pk.to_string()),
+            description: description_str,
+            destination: Some(invoice.recover_payee_pub_key().to_string()),
             preimage: None,
             bolt11: Some(params.bolt11),
         })
@@ -346,10 +372,9 @@ impl LightningNode {
         let pubkey = PublicKey::from_str(&params.destination_pubkey)
             .map_err(|e| LightningError::PaymentError(format!("Invalid pubkey: {}", e)))?;
 
-        let payment_id = node.send_spontaneous_payment(
-            params.amount_sats,
-            pubkey,
-        ).map_err(|e| LightningError::PaymentError(format!("Keysend failed: {:?}", e)))?;
+        let amount_msat = params.amount_sats * 1000;
+        let payment_id = node.spontaneous_payment().send(amount_msat, pubkey, None)
+            .map_err(|e| LightningError::PaymentError(format!("Keysend failed: {:?}", e)))?;
 
         Ok(PaymentInfo {
             payment_hash: hex::encode(payment_id.0),
@@ -375,14 +400,12 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
-        let address = bitcoin::Address::from_str(&params.address)
+        let address = BdkAddress::from_str(&params.address)
             .map_err(|e| LightningError::PaymentError(format!("Invalid address: {}", e)))?
             .assume_checked();
 
-        let txid = node.send_to_onchain_address(
-            &address,
-            params.amount_sats,
-        ).map_err(|e| LightningError::PaymentError(format!("On-chain send failed: {:?}", e)))?;
+        let txid = node.onchain_payment().send_to_address(&address, params.amount_sats, None)
+            .map_err(|e| LightningError::PaymentError(format!("On-chain send failed: {:?}", e)))?;
 
         Ok(txid.to_string())
     }
@@ -424,12 +447,12 @@ impl LightningNode {
                 payment_hash: hex::encode(payment.id.0),
                 payment_type,
                 amount_sats: payment.amount_msat.map(|a| a / 1000).unwrap_or(0),
-                fee_sats: payment.fee_msat.map(|f| f / 1000),
+                fee_sats: payment.fee_paid_msat.map(|f| f / 1000),
                 status,
                 timestamp: 0, // ldk-node doesn't expose timestamp
                 description: None,
                 destination: None,
-                preimage: payment.preimage.map(|p| hex::encode(p.0)),
+                preimage: None, // preimage not available in PaymentDetails
                 bolt11: None,
             }
         }).collect();
@@ -444,7 +467,7 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
-        let address = node.new_onchain_address()
+        let address = node.onchain_payment().new_address()
             .map_err(|e| LightningError::LdkError(format!("Failed to get address: {:?}", e)))?;
 
         Ok(address.to_string())
@@ -457,10 +480,8 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
-        let balance = node.spendable_onchain_balance_sats()
-            .map_err(|e| LightningError::LdkError(format!("Failed to get balance: {:?}", e)))?;
-
-        Ok(balance)
+        let balances = node.list_balances();
+        Ok(balances.spendable_onchain_balance_sats)
     }
 
     pub fn get_total_onchain_balance(&self) -> Result<u64, LightningError> {
@@ -470,10 +491,8 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
-        let balance = node.total_onchain_balance_sats()
-            .map_err(|e| LightningError::LdkError(format!("Failed to get balance: {:?}", e)))?;
-
-        Ok(balance)
+        let balances = node.list_balances();
+        Ok(balances.total_onchain_balance_sats)
     }
 }
 
