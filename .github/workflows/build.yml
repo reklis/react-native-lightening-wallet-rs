@@ -80,9 +80,6 @@ jobs:
       - name: Build Rust for Android
         run: npm run build:rust:android
 
-      - name: Build Android library
-        run: npm run build:android
-
       - name: Build Rust for iOS
         run: npm run build:rust:ios
 
@@ -91,7 +88,6 @@ jobs:
         with:
           name: android-build
           path: |
-            android/build/outputs/**/*.aar
             android/src/main/jniLibs/**/*.so
           retention-days: 7
 
@@ -108,13 +104,13 @@ jobs:
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Android" >> $GITHUB_STEP_SUMMARY
+          echo "### Android Native Libraries" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          find android/build/outputs -type f -name "*.aar" 2>/dev/null || echo "No AAR files found"
+          ls -lh android/src/main/jniLibs/*/*.so 2>/dev/null || echo "No Android libraries found"
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### iOS" >> $GITHUB_STEP_SUMMARY
+          echo "### iOS Libraries" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh ios/lib/*.a 2>/dev/null || echo "No .a files found"
+          ls -lh ios/lib/*.a 2>/dev/null || echo "No iOS libraries found"
           ls -d ios/*.xcframework 2>/dev/null || echo "No xcframework found"
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+rust/target
+android/build
+android/.gradle
+ios/build
+*.log
+.git
+.github
+.DS_Store
+.envrc
