@@ -1,0 +1,35 @@
+{
+  "name": "reactnative-lightening-wallet-rs",
+  "version": "0.1.0",
+  "description": "High-performance unified Lightning wallet for React Native",
+  "main": "js/index.js",
+  "types": "js/index.d.ts",
+  "scripts": {
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "build:ios": "./scripts/build-ios.sh",
+    "build:rust:android": "cd rust && cargo ndk -t arm64-v8a -t armeabi-v7a -o ../android/src/main/jniLibs build --release",
+    "build:rust:ios": "./scripts/build-ios.sh",
+    "build:all": "npm run build:rust:android && npm run build:rust:ios",
+    "test": "cd rust && cargo test",
+    "clean": "rm -rf android/build ios/build ios/lib ios/LighteningWallet.xcframework rust/target"
+  },
+  "keywords": [
+    "react-native",
+    "bitcoin",
+    "lightning",
+    "ldk",
+    "wallet",
+    "rust"
+  ],
+  "author": "Element FM",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-native": ">=0.60.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-native": "^0.72.0",
+    "typescript": "^5.0.0"
+  }
+}

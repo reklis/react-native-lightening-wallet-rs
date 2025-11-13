@@ -1,0 +1,78 @@
+buildscript {
+    ext.kotlin_version = '1.8.0'
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    compileSdkVersion 33
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    ndkVersion "25.1.8937393"
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'com.facebook.react:react-native:+'
+}
+
+// Task to build Rust library
+task buildRustRelease(type: Exec) {
+    workingDir '../rust'
+    commandLine 'cargo', 'ndk',
+            '-t', 'arm64-v8a',
+            '-t', 'armeabi-v7a',
+            '-o', '../android/src/main/jniLibs',
+            'build', '--release'
+}
+
+// Make sure Rust builds before Android
+tasks.whenTaskAdded { task ->
+    if (task.name == 'compileDebugKotlin' || task.name == 'compileReleaseKotlin') {
+        task.dependsOn buildRustRelease
+    }
+}
