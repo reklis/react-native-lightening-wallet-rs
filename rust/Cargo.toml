@@ -10,15 +10,10 @@ name = "reactnative_lightening_wallet"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-# LDK - Lightning Development Kit
-lightning = "0.0.123"
-lightning-invoice = "0.31"
-lightning-net-tokio = "0.0.123"
-lightning-background-processor = "0.0.123"
-lightning-block-sync = "0.0.123"
-lightning-persister = "0.0.123"
+# LDK Node - High-level Lightning implementation
+ldk-node = "0.6.2"
 
-# Bitcoin
+# Bitcoin & BIP39
 bitcoin = { version = "0.31", features = ["serde"] }
 bip39 = "2.0"
 

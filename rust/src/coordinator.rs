@@ -6,6 +6,7 @@ use crate::wallet::{KeyManager, UtxoManager, AddressManager, BalanceManager, Wal
 use crate::electrum::{ElectrumClient, get_default_peers};
 use crate::storage::Database;
 use crate::events::{EventEmitter, WalletEvent};
+use crate::ldk::{LightningNode, LightningError};
 
 #[derive(Debug, Error)]
 pub enum CoordinatorError {
@@ -21,6 +22,8 @@ pub enum CoordinatorError {
     StorageError(String),
     #[error("Sync error: {0}")]
     SyncError(String),
+    #[error("Lightning error: {0}")]
+    LightningError(String),
 }
 
 pub struct WalletCoordinator {
@@ -29,9 +32,11 @@ pub struct WalletCoordinator {
     address_manager: Arc<AddressManager>,
     balance_manager: Arc<BalanceManager>,
     electrum_client: Arc<Mutex<Option<ElectrumClient>>>,
+    lightning_node: Arc<LightningNode>,
     database: Arc<Database>,
     event_emitter: Arc<EventEmitter>,
     network: Arc<Mutex<Option<Network>>>,
+    storage_path: String,
 }
 
 impl WalletCoordinator {
@@ -39,15 +44,24 @@ impl WalletCoordinator {
         let database = Database::new(db_path)
             .map_err(|e| CoordinatorError::StorageError(format!("{}", e)))?;
 
+        // Extract directory path for Lightning storage
+        let storage_path = std::path::Path::new(db_path)
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .to_string_lossy()
+            .to_string();
+
         Ok(WalletCoordinator {
             key_manager: Arc::new(Mutex::new(None)),
             utxo_manager: Arc::new(UtxoManager::new()),
             address_manager: Arc::new(AddressManager::new()),
             balance_manager: Arc::new(BalanceManager::new()),
             electrum_client: Arc::new(Mutex::new(None)),
+            lightning_node: Arc::new(LightningNode::new()),
             database: Arc::new(database),
             event_emitter: Arc::new(EventEmitter::new(1000)),
             network: Arc::new(Mutex::new(None)),
+            storage_path,
         })
     }
 
@@ -70,6 +84,10 @@ impl WalletCoordinator {
         let key_manager = KeyManager::from_mnemonic(mnemonic, network)
             .map_err(|e| CoordinatorError::KeyError(format!("{}", e)))?;
 
+        // Get Lightning seed before moving key_manager
+        let lightning_seed = key_manager.get_lightning_seed()
+            .map_err(|e| CoordinatorError::KeyError(format!("{}", e)))?;
+
         {
             let mut km = self.key_manager.lock()
                 .map_err(|e| CoordinatorError::KeyError(format!("Lock error: {}", e)))?;
@@ -87,6 +105,19 @@ impl WalletCoordinator {
 
         // Initialize addresses
         self.derive_initial_addresses()?;
+
+        // Initialize Lightning node
+        let lightning_storage = format!("{}/lightning", self.storage_path);
+        self.lightning_node.initialize(
+            lightning_seed,
+            network,
+            &lightning_storage,
+            None, // Will set Esplora server later
+        ).map_err(|e| CoordinatorError::LightningError(format!("{}", e)))?;
+
+        // Start Lightning node
+        self.lightning_node.start()
+            .map_err(|e| CoordinatorError::LightningError(format!("{}", e)))?;
 
         Ok(())
     }
@@ -278,7 +309,15 @@ impl WalletCoordinator {
         Arc::clone(&self.database)
     }
 
+    pub fn get_lightning_node(&self) -> Arc<LightningNode> {
+        Arc::clone(&self.lightning_node)
+    }
+
     pub fn disconnect(&self) -> Result<(), CoordinatorError> {
+        // Stop Lightning node first
+        self.lightning_node.stop()
+            .map_err(|e| CoordinatorError::LightningError(format!("{}", e)))?;
+
         let mut ec = self.electrum_client.lock()
             .map_err(|e| CoordinatorError::ElectrumError(format!("Lock error: {}", e)))?;
         *ec = None;

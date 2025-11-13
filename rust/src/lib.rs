@@ -3,6 +3,7 @@ mod wallet;
 mod storage;
 mod events;
 mod coordinator;
+mod ldk;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
