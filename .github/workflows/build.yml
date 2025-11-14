@@ -1,61 +1,108 @@
-# Example: Use the Docker image for faster builds
-# Rename this to build.yml to use the pre-built Docker image instead of installing dependencies
-name: Build iOS and Android (Docker)
+name: Build and Release
 
 on:
   push:
-    branches: [ dev, main ]
-  pull_request:
-    branches: [ dev, main ]
-  workflow_dispatch:
+    tags:
+      - 'v*.*.*'
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/${{ github.repository }}:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+  build-and-publish:
+    name: Build and Publish to npm
+    runs-on: macos-latest
+    permissions:
+      id-token: write  # Required for OIDC trusted publishing
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
           path: |
+            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             rust/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-all-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-all-
 
-      - name: Install Node dependencies
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Install dependencies
         run: npm ci
 
       - name: Run Rust tests
         run: npm run test
 
-      - name: Build Rust for Android
+      - name: Build iOS libraries
+        run: npm run build:rust:ios
+
+      - name: Build Android libraries
         run: npm run build:rust:android
 
-      - name: Upload Android build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-build
-          path: |
-            android/src/main/jniLibs/**/*.so
-          retention-days: 7
+      - name: Publish to npm
+        run: npm publish --provenance
 
-      - name: Build summary
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            android/src/main/jniLibs/**/*.so
+            ios/lib/*.a
+            ios/*.xcframework
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
         run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### Release Published Successfully! :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Android Native Libraries" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** reactnative-lightening-wallet-rs" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $(node -p "require('./package.json').version")" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Published to:" >> $GITHUB_STEP_SUMMARY
+          echo "- :package: npm registry" >> $GITHUB_STEP_SUMMARY
+          echo "- :octocat: GitHub Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Build Artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "##### Android Libraries" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh android/src/main/jniLibs/*/*.so
+          ls -lh android/src/main/jniLibs/*/*.so || echo "No Android libraries found"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "##### iOS Libraries" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ls -lh ios/lib/*.a || echo "No iOS libraries found"
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

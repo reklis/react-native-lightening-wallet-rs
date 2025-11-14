@@ -11,7 +11,8 @@
     "build:rust:ios": "./scripts/build-ios.sh",
     "build:all": "npm run build:rust:android && npm run build:rust:ios",
     "test": "cd rust && cargo test",
-    "clean": "rm -rf android/build ios/build ios/lib ios/LighteningWallet.xcframework rust/target"
+    "clean": "rm -rf android/build ios/build ios/lib ios/LighteningWallet.xcframework rust/target",
+    "version:bump": "./scripts/version-bump.sh"
   },
   "keywords": [
     "react-native",

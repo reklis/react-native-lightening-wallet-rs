@@ -1,0 +1,36 @@
+# Build directories
+rust/target/
+android/build/
+android/.gradle/
+ios/build/
+
+# Scripts and tooling
+scripts/
+.github/
+.git/
+
+# Development files
+*.log
+.DS_Store
+.envrc
+
+# Documentation
+*.md
+!README.md
+
+# Rust source (include only built libraries)
+rust/src/
+rust/Cargo.toml
+rust/Cargo.lock
+
+# Test files
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
