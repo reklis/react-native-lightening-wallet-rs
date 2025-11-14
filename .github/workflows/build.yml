@@ -61,6 +61,8 @@ jobs:
 
       - name: Build iOS libraries
         run: npm run build:rust:ios
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: '12.0'
 
       - name: Build Android libraries
         run: npm run build:rust:android

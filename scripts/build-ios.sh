@@ -6,6 +6,9 @@ echo "Building Rust library for iOS..."
 
 cd "$(dirname "$0")/../rust"
 
+# Set iOS deployment target for consistent builds (aligns with React Native minimum)
+export IPHONEOS_DEPLOYMENT_TARGET=12.0
+
 # Install iOS targets if not already installed
 echo "Installing Rust iOS targets..."
 rustup target add aarch64-apple-ios
