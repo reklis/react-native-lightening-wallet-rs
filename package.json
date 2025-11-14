@@ -4,6 +4,10 @@
   "description": "High-performance unified Lightning wallet for React Native",
   "main": "js/index.js",
   "types": "js/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/reklis/react-native-lightening-wallet-rs.git"
+  },
   "scripts": {
     "build:android": "cd android && ./gradlew assembleRelease",
     "build:ios": "./scripts/build-ios.sh",
