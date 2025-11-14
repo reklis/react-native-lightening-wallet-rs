@@ -6,9 +6,459 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build-and-publish:
-    name: Build and Publish to npm
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Run tests
+        run: cd rust && cargo test
+
+  # iOS Builds - parallel
+  build-ios-x86_64:
+    name: Build iOS x86_64
     runs-on: macos-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-ios
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-ios-x86_64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-ios-
+
+      - name: Build
+        run: |
+          cd rust
+          cargo build --release --target x86_64-apple-ios
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: '12.0'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-x86_64
+          path: rust/target/x86_64-apple-ios/release/libreactnative_lightening_wallet.a
+          retention-days: 1
+
+  build-ios-aarch64-sim:
+    name: Build iOS aarch64 Simulator
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-ios-aarch64-sim-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-ios-
+
+      - name: Build
+        run: |
+          cd rust
+          cargo build --release --target aarch64-apple-ios-sim
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: '12.0'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-aarch64-sim
+          path: rust/target/aarch64-apple-ios-sim/release/libreactnative_lightening_wallet.a
+          retention-days: 1
+
+  build-ios-aarch64-device:
+    name: Build iOS aarch64 Device
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-ios-aarch64-device-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-ios-
+
+      - name: Build
+        run: |
+          cd rust
+          cargo build --release --target aarch64-apple-ios
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: '12.0'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-aarch64-device
+          path: rust/target/aarch64-apple-ios/release/libreactnative_lightening_wallet.a
+          retention-days: 1
+
+  # Android Builds - parallel
+  build-android-arm64:
+    name: Build Android arm64-v8a
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-android-arm64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build
+        run: |
+          cd rust
+          cargo ndk -t arm64-v8a build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64-v8a
+          path: rust/target/aarch64-linux-android/release/libreactnative_lightening_wallet.so
+          retention-days: 1
+
+  build-android-armv7:
+    name: Build Android armeabi-v7a
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: armv7-linux-androideabi
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-android-armv7-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build
+        run: |
+          cd rust
+          cargo ndk -t armeabi-v7a build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-armeabi-v7a
+          path: rust/target/armv7-linux-androideabi/release/libreactnative_lightening_wallet.so
+          retention-days: 1
+
+  build-android-x86_64:
+    name: Build Android x86_64
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-linux-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-android-x86_64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build
+        run: |
+          cd rust
+          cargo ndk -t x86_64 build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-x86_64
+          path: rust/target/x86_64-linux-android/release/libreactnative_lightening_wallet.so
+          retention-days: 1
+
+  build-android-i686:
+    name: Build Android i686
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-linux-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-android-i686-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-android-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build
+        run: |
+          cd rust
+          cargo ndk -t x86 build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-i686
+          path: rust/target/i686-linux-android/release/libreactnative_lightening_wallet.so
+          retention-days: 1
+
+  # Combine iOS artifacts
+  combine-ios:
+    name: Combine iOS Artifacts
+    runs-on: macos-latest
+    needs: [build-ios-x86_64, build-ios-aarch64-sim, build-ios-aarch64-device]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-x86_64
+          path: artifacts/ios-x86_64
+
+      - name: Download aarch64-sim artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-aarch64-sim
+          path: artifacts/ios-aarch64-sim
+
+      - name: Download aarch64-device artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-aarch64-device
+          path: artifacts/ios-aarch64-device
+
+      - name: Create iOS libraries
+        run: |
+          mkdir -p ios/lib
+
+          # Create universal simulator library
+          lipo -create \
+            artifacts/ios-x86_64/libreactnative_lightening_wallet.a \
+            artifacts/ios-aarch64-sim/libreactnative_lightening_wallet.a \
+            -output ios/lib/libreactnative_lightening_wallet_sim.a
+
+          # Copy device library
+          cp artifacts/ios-aarch64-device/libreactnative_lightening_wallet.a \
+            ios/lib/libreactnative_lightening_wallet_device.a
+
+          # Create XCFramework
+          xcodebuild -create-xcframework \
+            -library ios/lib/libreactnative_lightening_wallet_sim.a \
+            -library ios/lib/libreactnative_lightening_wallet_device.a \
+            -output ios/LighteningWallet.xcframework
+
+          # Create symlink for development
+          ln -sf libreactnative_lightening_wallet_sim.a ios/lib/libreactnative_lightening_wallet.a
+
+      - name: Upload combined iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-combined
+          path: |
+            ios/lib/*.a
+            ios/*.xcframework
+          retention-days: 1
+
+  # Combine Android artifacts
+  combine-android:
+    name: Combine Android Artifacts
+    runs-on: ubuntu-latest
+    needs: [build-android-arm64, build-android-armv7, build-android-x86_64, build-android-i686]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download arm64-v8a artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-arm64-v8a
+          path: artifacts/android-arm64-v8a
+
+      - name: Download armeabi-v7a artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-armeabi-v7a
+          path: artifacts/android-armeabi-v7a
+
+      - name: Download x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-x86_64
+          path: artifacts/android-x86_64
+
+      - name: Download i686 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-i686
+          path: artifacts/android-i686
+
+      - name: Organize Android libraries
+        run: |
+          mkdir -p android/src/main/jniLibs/arm64-v8a
+          mkdir -p android/src/main/jniLibs/armeabi-v7a
+          mkdir -p android/src/main/jniLibs/x86_64
+          mkdir -p android/src/main/jniLibs/x86
+
+          cp artifacts/android-arm64-v8a/libreactnative_lightening_wallet.so \
+            android/src/main/jniLibs/arm64-v8a/
+          cp artifacts/android-armeabi-v7a/libreactnative_lightening_wallet.so \
+            android/src/main/jniLibs/armeabi-v7a/
+          cp artifacts/android-x86_64/libreactnative_lightening_wallet.so \
+            android/src/main/jniLibs/x86_64/
+          cp artifacts/android-i686/libreactnative_lightening_wallet.so \
+            android/src/main/jniLibs/x86/
+
+      - name: Upload combined Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-combined
+          path: android/src/main/jniLibs/**/*.so
+          retention-days: 1
+
+  # Publish to npm
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: [combine-ios, combine-android]
     permissions:
       id-token: write  # Required for OIDC trusted publishing
       contents: write
@@ -26,49 +476,34 @@ jobs:
       - name: Update npm
         run: npm install -g npm@latest
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          name: ios-combined
+          path: ios/
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
         with:
-          ndk-version: r26c
-          add-to-path: true
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            rust/target/
-          key: ${{ runner.os }}-cargo-all-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-all-
-
-      - name: Install cargo-ndk
-        run: cargo install cargo-ndk || true
+          name: android-combined
+          path: android/src/main/jniLibs/
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Rust tests
-        run: npm run test
-
-      - name: Build iOS libraries
-        run: npm run build:rust:ios
-        env:
-          IPHONEOS_DEPLOYMENT_TARGET: '12.0'
-
-      - name: Build Android libraries
-        run: npm run build:rust:android
+      - name: Verify artifacts
+        run: |
+          echo "iOS artifacts:"
+          ls -lh ios/lib/*.a
+          ls -lh ios/*.xcframework
+          echo ""
+          echo "Android artifacts:"
+          ls -lh android/src/main/jniLibs/*/*.so
 
       - name: Publish to npm
         run: npm publish --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -101,10 +536,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "##### Android Libraries" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh android/src/main/jniLibs/*/*.so || echo "No Android libraries found"
+          ls -lh android/src/main/jniLibs/*/*.so
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "##### iOS Libraries" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          ls -lh ios/lib/*.a || echo "No iOS libraries found"
+          ls -lh ios/lib/*.a
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
