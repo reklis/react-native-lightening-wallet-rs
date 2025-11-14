@@ -39,17 +39,21 @@ bump_version() {
 # Update Cargo.toml version
 update_cargo_version() {
     local new_version=$1
-    
+
     # Update main Cargo.toml
     if [ -f "Cargo.toml" ]; then
         sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
         rm Cargo.toml.bak
     fi
-    
+
     # Update rust/Cargo.toml
     if [ -f "rust/Cargo.toml" ]; then
         sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" rust/Cargo.toml
         rm rust/Cargo.toml.bak
+
+        # Update Cargo.lock by running cargo update in the rust directory
+        print_info "Updating Cargo.lock..."
+        (cd rust && cargo update --workspace)
     fi
 }
 
@@ -102,20 +106,20 @@ main() {
 
     # Show changes
     print_info "Changes to be committed:"
-    git diff package.json rust/Cargo.toml
+    git diff package.json package-lock.json rust/Cargo.toml rust/Cargo.lock
 
     # Confirm
     read -p "$(echo -e ${YELLOW}Do you want to commit and tag version $NEW_VERSION? [y/N]:${NC} )" -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         print_warning "Version bump cancelled. Reverting changes..."
-        git checkout package.json package-lock.json rust/Cargo.toml 2>/dev/null || true
+        git checkout package.json package-lock.json rust/Cargo.toml rust/Cargo.lock 2>/dev/null || true
         exit 1
     fi
 
     # Commit changes
     print_info "Committing version bump..."
-    git add package.json package-lock.json rust/Cargo.toml
+    git add package.json package-lock.json rust/Cargo.toml rust/Cargo.lock
     git commit -m "chore: bump version to $NEW_VERSION"
 
     # Create tag
