@@ -88,8 +88,10 @@ main() {
         NEW_VERSION=$BUMP_TYPE
         npm version $NEW_VERSION --no-git-tag-version
     else
-        # Use npm to bump version
+        # Use npm to bump version (returns with 'v' prefix)
         NEW_VERSION=$(bump_version $BUMP_TYPE)
+        # Remove the 'v' prefix from npm output
+        NEW_VERSION=${NEW_VERSION#v}
     fi
 
     print_info "New version: $NEW_VERSION"
