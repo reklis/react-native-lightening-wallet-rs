@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     ca-certificates \
     openjdk-17-jdk \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20.x
