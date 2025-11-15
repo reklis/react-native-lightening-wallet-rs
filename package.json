@@ -7,7 +7,7 @@
   "react-native": "js/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/reklis/react-native-lightening-wallet-rs.git"
+    "url": "git+https://github.com/reklis/react-native-lightening-wallet-rs.git"
   },
   "scripts": {
     "build": "tsc js/index.ts --outDir js --declaration --skipLibCheck",
