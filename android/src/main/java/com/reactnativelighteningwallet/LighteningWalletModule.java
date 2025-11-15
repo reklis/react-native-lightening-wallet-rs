@@ -17,10 +17,10 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
 
     static {
         try {
-            System.loadLibrary("lightening_wallet_rs");
-            Log.d(TAG, "Successfully loaded lightening_wallet_rs library");
+            System.loadLibrary("reactnative_lightening_wallet");
+            Log.d(TAG, "Successfully loaded reactnative_lightening_wallet library");
         } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Failed to load lightening_wallet_rs library", e);
+            Log.e(TAG, "Failed to load reactnative_lightening_wallet library", e);
             throw e;
         }
     }
