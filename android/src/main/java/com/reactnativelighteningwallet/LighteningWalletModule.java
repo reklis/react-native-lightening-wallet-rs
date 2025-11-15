@@ -40,7 +40,7 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     private static native String nativeCloseChannel(String userId, String channelId, boolean force);
     private static native String nativeListChannels(String userId);
     private static native String nativeConnectPeer(String userId, String nodeId, String address, int port);
-    private static native void nativeDisconnect(String userId);
+    private static native String nativeDisconnect(String userId);
 
     public LighteningWalletModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -219,8 +219,8 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void disconnect(String userId, Promise promise) {
         try {
-            nativeDisconnect(userId);
-            promise.resolve(null);
+            String result = nativeDisconnect(userId);
+            promise.resolve(result);
         } catch (Exception e) {
             Log.e(TAG, "disconnect error", e);
             promise.reject("DISCONNECT_ERROR", e.getMessage(), e);
