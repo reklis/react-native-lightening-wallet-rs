@@ -3,3 +3,5 @@ node_modules
 android/build
 android/.gradle
 android/src/main/jniLibs
+js/*.js
+js/*.d.ts

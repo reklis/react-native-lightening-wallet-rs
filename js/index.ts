@@ -131,8 +131,7 @@ export class LighteningWalletAPI {
    * Generate a new BIP39 mnemonic phrase
    */
   static async generateMnemonic(): Promise<string> {
-    const methodName = Platform.OS === 'ios' ? 'generateMnemonic' : 'nativeGenerateMnemonic';
-    const result = await LighteningWallet[methodName]();
+    const result = await LighteningWallet.generateMnemonic();
     const data = parseResponse<{ mnemonic: string }>(result);
     return data.mnemonic;
   }
@@ -193,8 +192,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'getEvents' : 'nativeGetEvents';
-    const result = await LighteningWallet[methodName](this.userId);
+    const result = await LighteningWallet.getEvents(this.userId);
     return parseResponse<WalletEvent[]>(result);
   }
 
