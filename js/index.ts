@@ -116,8 +116,7 @@ export class LighteningWalletAPI {
     network: 'bitcoin' | 'testnet',
     dbPath: string
   ): Promise<{ userId: string; initialized: boolean }> {
-    const methodName = Platform.OS === 'ios' ? 'initialize' : 'nativeInitialize';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.initialize(
       userId,
       mnemonic,
       network,
@@ -145,8 +144,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'getBalance' : 'nativeGetBalance';
-    const result = await LighteningWallet[methodName](this.userId);
+    const result = await LighteningWallet.getBalance(this.userId);
     return parseResponse<WalletBalance>(result);
   }
 
@@ -157,8 +155,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'syncWallet' : 'nativeSyncWallet';
-    const result = await LighteningWallet[methodName](this.userId);
+    const result = await LighteningWallet.sync(this.userId);
     return parseResponse<{ synced: boolean }>(result);
   }
 
@@ -169,8 +166,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'getReceivingAddress' : 'nativeGetReceivingAddress';
-    const result = await LighteningWallet[methodName](this.userId);
+    const result = await LighteningWallet.getReceivingAddress(this.userId);
     const data = parseResponse<{ address: string }>(result);
     return data.address;
   }
@@ -182,8 +178,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'listPayments' : 'nativeListPayments';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.listPayments(
       this.userId,
       limit || 0,
       offset || 0
@@ -221,8 +216,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'disconnect' : 'nativeDisconnect';
-    const result = await LighteningWallet[methodName](this.userId);
+    const result = await LighteningWallet.disconnect(this.userId);
     const data = parseResponse<{ disconnected: boolean }>(result);
     this.userId = null;
     return data;
@@ -239,8 +233,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'createInvoice' : 'nativeCreateInvoice';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.createInvoice(
       this.userId,
       amountSats || 0,
       description || '',
@@ -256,8 +249,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'payInvoice' : 'nativePayInvoice';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.payInvoice(
       this.userId,
       bolt11,
       amountSats || 0
@@ -286,8 +278,7 @@ export class LighteningWalletAPI {
         )
       : '';
 
-    const methodName = Platform.OS === 'ios' ? 'sendKeysend' : 'nativeSendKeysend';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.sendKeysend(
       this.userId,
       destinationPubkey,
       amountSats,
@@ -309,8 +300,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'openChannel' : 'nativeOpenChannel';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.openChannel(
       this.userId,
       counterpartyNodeId,
       channelValueSatoshis,
@@ -328,8 +318,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'closeChannel' : 'nativeCloseChannel';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.closeChannel(
       this.userId,
       channelId,
       force
@@ -344,8 +333,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'listChannels' : 'nativeListChannels';
-    const result = await LighteningWallet[methodName](this.userId);
+    const result = await LighteningWallet.listChannels(this.userId);
     return parseResponse<ChannelInfo[]>(result);
   }
 
@@ -360,8 +348,7 @@ export class LighteningWalletAPI {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
-    const methodName = Platform.OS === 'ios' ? 'connectPeer' : 'nativeConnectPeer';
-    const result = await LighteningWallet[methodName](
+    const result = await LighteningWallet.connectPeer(
       this.userId,
       nodeId,
       address,
