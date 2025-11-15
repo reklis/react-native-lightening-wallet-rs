@@ -46,6 +46,29 @@ export interface Payment {
   bolt11?: string;
 }
 
+export interface ChannelInfo {
+  channel_id: string;
+  counterparty_node_id: string;
+  channel_value_sats: number;
+  balance_sats: number;
+  outbound_capacity_sats: number;
+  inbound_capacity_sats: number;
+  is_usable: boolean;
+  is_public: boolean;
+  is_ready: boolean;
+  is_closing: boolean;
+  confirmations_required?: number;
+}
+
+export interface InvoiceInfo {
+  bolt11: string;
+  payment_hash: string;
+  amount_sats?: number;
+  description?: string;
+  created_at: number;
+  expires_at: number;
+}
+
 export type WalletEvent =
   | { type: 'BalanceUpdated'; onchain_confirmed: number; onchain_unconfirmed: number; lightning_balance: number; total: number }
   | { type: 'PaymentReceived'; payment_hash: string; amount_sats: number; description?: string }
@@ -203,6 +226,148 @@ export class LighteningWalletAPI {
     const data = parseResponse<{ disconnected: boolean }>(result);
     this.userId = null;
     return data;
+  }
+
+  /**
+   * Create a Lightning invoice
+   */
+  async createInvoice(
+    amountSats?: number,
+    description?: string,
+    expirySecs?: number
+  ): Promise<InvoiceInfo> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const methodName = Platform.OS === 'ios' ? 'createInvoice' : 'nativeCreateInvoice';
+    const result = await LighteningWallet[methodName](
+      this.userId,
+      amountSats || 0,
+      description || '',
+      expirySecs || 3600
+    );
+    return parseResponse<InvoiceInfo>(result);
+  }
+
+  /**
+   * Pay a Lightning invoice
+   */
+  async payInvoice(bolt11: string, amountSats?: number): Promise<Payment> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const methodName = Platform.OS === 'ios' ? 'payInvoice' : 'nativePayInvoice';
+    const result = await LighteningWallet[methodName](
+      this.userId,
+      bolt11,
+      amountSats || 0
+    );
+    return parseResponse<Payment>(result);
+  }
+
+  /**
+   * Send a keysend payment (for Podcasting 2.0)
+   */
+  async sendKeysend(
+    destinationPubkey: string,
+    amountSats: number,
+    customRecords?: Record<number, Uint8Array>
+  ): Promise<Payment> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+
+    // Convert custom records to JSON format
+    const customRecordsJson = customRecords
+      ? JSON.stringify(
+          Object.fromEntries(
+            Object.entries(customRecords).map(([k, v]) => [k, Array.from(v)])
+          )
+        )
+      : '';
+
+    const methodName = Platform.OS === 'ios' ? 'sendKeysend' : 'nativeSendKeysend';
+    const result = await LighteningWallet[methodName](
+      this.userId,
+      destinationPubkey,
+      amountSats,
+      customRecordsJson
+    );
+    return parseResponse<Payment>(result);
+  }
+
+  /**
+   * Open a Lightning channel
+   */
+  async openChannel(
+    counterpartyNodeId: string,
+    channelValueSatoshis: number,
+    pushMsat?: number,
+    peerAddress?: string,
+    peerPort?: number
+  ): Promise<{ channel_id: string }> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const methodName = Platform.OS === 'ios' ? 'openChannel' : 'nativeOpenChannel';
+    const result = await LighteningWallet[methodName](
+      this.userId,
+      counterpartyNodeId,
+      channelValueSatoshis,
+      pushMsat || 0,
+      peerAddress || '',
+      peerPort || 0
+    );
+    return parseResponse<{ channel_id: string }>(result);
+  }
+
+  /**
+   * Close a Lightning channel
+   */
+  async closeChannel(channelId: string, force: boolean = false): Promise<{ closed: boolean }> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const methodName = Platform.OS === 'ios' ? 'closeChannel' : 'nativeCloseChannel';
+    const result = await LighteningWallet[methodName](
+      this.userId,
+      channelId,
+      force
+    );
+    return parseResponse<{ closed: boolean }>(result);
+  }
+
+  /**
+   * List all Lightning channels
+   */
+  async listChannels(): Promise<ChannelInfo[]> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const methodName = Platform.OS === 'ios' ? 'listChannels' : 'nativeListChannels';
+    const result = await LighteningWallet[methodName](this.userId);
+    return parseResponse<ChannelInfo[]>(result);
+  }
+
+  /**
+   * Connect to a Lightning peer
+   */
+  async connectPeer(
+    nodeId: string,
+    address: string,
+    port: number
+  ): Promise<{ connected: boolean }> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const methodName = Platform.OS === 'ios' ? 'connectPeer' : 'nativeConnectPeer';
+    const result = await LighteningWallet[methodName](
+      this.userId,
+      nodeId,
+      address,
+      port
+    );
+    return parseResponse<{ connected: boolean }>(result);
   }
 }
 

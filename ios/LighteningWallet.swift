@@ -224,6 +224,217 @@ class LighteningWallet: NSObject {
         }
     }
 
+    @objc(createInvoice:amountSats:description:expirySecs:resolver:rejecter:)
+    func createInvoice(
+        userId: String,
+        amountSats: Int64,
+        description: String,
+        expirySecs: Int32,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                description.withCString { descPtr in
+                    self.wallet_create_invoice(userIdPtr, amountSats, descPtr, expirySecs)
+                }
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("INVOICE_ERROR", "Failed to create invoice", nil)
+                }
+            }
+        }
+    }
+
+    @objc(payInvoice:bolt11:amountSats:resolver:rejecter:)
+    func payInvoice(
+        userId: String,
+        bolt11: String,
+        amountSats: Int64,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                bolt11.withCString { bolt11Ptr in
+                    self.wallet_pay_invoice(userIdPtr, bolt11Ptr, amountSats)
+                }
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("PAYMENT_ERROR", "Failed to pay invoice", nil)
+                }
+            }
+        }
+    }
+
+    @objc(sendKeysend:destinationPubkey:amountSats:customRecordsJson:resolver:rejecter:)
+    func sendKeysend(
+        userId: String,
+        destinationPubkey: String,
+        amountSats: Int64,
+        customRecordsJson: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                destinationPubkey.withCString { pubkeyPtr in
+                    customRecordsJson.withCString { recordsPtr in
+                        self.wallet_send_keysend(userIdPtr, pubkeyPtr, amountSats, recordsPtr)
+                    }
+                }
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("KEYSEND_ERROR", "Failed to send keysend", nil)
+                }
+            }
+        }
+    }
+
+    @objc(openChannel:counterpartyNodeId:channelValueSatoshis:pushMsat:peerAddress:peerPort:resolver:rejecter:)
+    func openChannel(
+        userId: String,
+        counterpartyNodeId: String,
+        channelValueSatoshis: Int64,
+        pushMsat: Int64,
+        peerAddress: String,
+        peerPort: Int32,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                counterpartyNodeId.withCString { nodeIdPtr in
+                    peerAddress.withCString { addressPtr in
+                        self.wallet_open_channel(userIdPtr, nodeIdPtr, channelValueSatoshis, pushMsat, addressPtr, peerPort)
+                    }
+                }
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("CHANNEL_ERROR", "Failed to open channel", nil)
+                }
+            }
+        }
+    }
+
+    @objc(closeChannel:channelId:force:resolver:rejecter:)
+    func closeChannel(
+        userId: String,
+        channelId: String,
+        force: Bool,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                channelId.withCString { channelIdPtr in
+                    self.wallet_close_channel(userIdPtr, channelIdPtr, force)
+                }
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("CHANNEL_ERROR", "Failed to close channel", nil)
+                }
+            }
+        }
+    }
+
+    @objc(listChannels:resolver:rejecter:)
+    func listChannels(
+        userId: String,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                self.wallet_list_channels(userIdPtr)
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("CHANNEL_ERROR", "Failed to list channels", nil)
+                }
+            }
+        }
+    }
+
+    @objc(connectPeer:nodeId:address:port:resolver:rejecter:)
+    func connectPeer(
+        userId: String,
+        nodeId: String,
+        address: String,
+        port: Int32,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let result = userId.withCString { userIdPtr in
+                nodeId.withCString { nodeIdPtr in
+                    address.withCString { addressPtr in
+                        self.wallet_connect_peer(userIdPtr, nodeIdPtr, addressPtr, port)
+                    }
+                }
+            }
+
+            if let jsonString = self.stringFromCString(result) {
+                DispatchQueue.main.async {
+                    resolve(jsonString)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    reject("PEER_ERROR", "Failed to connect to peer", nil)
+                }
+            }
+        }
+    }
+
     @objc
     static func requiresMainQueueSetup() -> Bool {
         return false

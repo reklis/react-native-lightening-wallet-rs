@@ -181,6 +181,156 @@ fn disconnect_wallet_impl(user_id: String) -> String {
     }
 }
 
+// Create Lightning invoice
+fn create_invoice_impl(user_id: String, amount_sats: Option<u64>, description: Option<String>, expiry_secs: u32) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        let params = ldk::CreateInvoiceParams {
+            amount_sats,
+            description,
+            expiry_secs,
+        };
+        match lightning_node.create_invoice(params) {
+            Ok(invoice) => Response::success(serde_json::to_value(invoice).unwrap()),
+            Err(e) => Response::error(format!("Failed to create invoice: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Pay Lightning invoice
+fn pay_invoice_impl(user_id: String, bolt11: String, amount_sats: Option<u64>) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        let params = ldk::PayInvoiceParams {
+            bolt11,
+            amount_sats,
+        };
+        match lightning_node.pay_invoice(params) {
+            Ok(payment) => Response::success(serde_json::to_value(payment).unwrap()),
+            Err(e) => Response::error(format!("Failed to pay invoice: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Send keysend payment (for Podcasting 2.0)
+fn send_keysend_impl(user_id: String, destination_pubkey: String, amount_sats: u64, custom_records_json: Option<String>) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+
+        // Parse custom records from JSON
+        let custom_records = if let Some(json) = custom_records_json {
+            match serde_json::from_str::<std::collections::HashMap<u64, Vec<u8>>>(&json) {
+                Ok(records) => records,
+                Err(e) => return Response::error(format!("Invalid custom records JSON: {}", e)),
+            }
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        let params = ldk::KeysendParams {
+            destination_pubkey,
+            amount_sats,
+            custom_records,
+        };
+
+        match lightning_node.send_keysend(params) {
+            Ok(payment) => Response::success(serde_json::to_value(payment).unwrap()),
+            Err(e) => Response::error(format!("Failed to send keysend: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Open Lightning channel
+fn open_channel_impl(user_id: String, counterparty_node_id: String, channel_value_satoshis: u64, push_msat: u64, peer_address: Option<String>, peer_port: Option<u16>) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        let params = ldk::OpenChannelParams {
+            counterparty_node_id,
+            channel_value_satoshis,
+            push_msat,
+            is_public: false, // Default to private channels
+            peer_address,
+            peer_port,
+        };
+        match lightning_node.open_channel(params) {
+            Ok(channel_id) => Response::success(json!({ "channel_id": channel_id })),
+            Err(e) => Response::error(format!("Failed to open channel: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Close Lightning channel
+fn close_channel_impl(user_id: String, channel_id: String, force: bool) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        let params = ldk::CloseChannelParams {
+            channel_id,
+            force,
+            peer_address: None,
+            peer_port: None,
+        };
+        match lightning_node.close_channel(params) {
+            Ok(_) => Response::success(json!({ "closed": true })),
+            Err(e) => Response::error(format!("Failed to close channel: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// List Lightning channels
+fn list_channels_impl(user_id: String) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        match lightning_node.list_channels() {
+            Ok(channels) => Response::success(serde_json::to_value(channels).unwrap()),
+            Err(e) => Response::error(format!("Failed to list channels: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Connect to peer
+fn connect_peer_impl(user_id: String, node_id: String, address: String, port: u16) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        let params = ldk::ConnectPeerParams {
+            node_id,
+            address,
+            port,
+        };
+        match lightning_node.connect_peer(params) {
+            Ok(_) => Response::success(json!({ "connected": true })),
+            Err(e) => Response::error(format!("Failed to connect peer: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
 // Android JNI bindings
 #[cfg(target_os = "android")]
 #[no_mangle]
@@ -289,6 +439,136 @@ pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_na
     env.new_string(result).unwrap().into_raw()
 }
 
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeCreateInvoice(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    amount_sats: i64,
+    description: JString,
+    expiry_secs: i32,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let amount_opt = if amount_sats > 0 { Some(amount_sats as u64) } else { None };
+    let desc: String = env.get_string(&description).unwrap().into();
+    let desc_opt = if desc.is_empty() { None } else { Some(desc) };
+
+    let result = create_invoice_impl(user_id, amount_opt, desc_opt, expiry_secs as u32);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativePayInvoice(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    bolt11: JString,
+    amount_sats: i64,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let bolt11: String = env.get_string(&bolt11).unwrap().into();
+    let amount_opt = if amount_sats > 0 { Some(amount_sats as u64) } else { None };
+
+    let result = pay_invoice_impl(user_id, bolt11, amount_opt);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeSendKeysend(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    destination_pubkey: JString,
+    amount_sats: i64,
+    custom_records_json: JString,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let destination_pubkey: String = env.get_string(&destination_pubkey).unwrap().into();
+    let custom_records: String = env.get_string(&custom_records_json).unwrap().into();
+    let custom_records_opt = if custom_records.is_empty() { None } else { Some(custom_records) };
+
+    let result = send_keysend_impl(user_id, destination_pubkey, amount_sats as u64, custom_records_opt);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeOpenChannel(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    counterparty_node_id: JString,
+    channel_value_satoshis: i64,
+    push_msat: i64,
+    peer_address: JString,
+    peer_port: i32,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let counterparty_node_id: String = env.get_string(&counterparty_node_id).unwrap().into();
+    let address: String = env.get_string(&peer_address).unwrap().into();
+    let address_opt = if address.is_empty() { None } else { Some(address) };
+    let port_opt = if peer_port > 0 { Some(peer_port as u16) } else { None };
+
+    let result = open_channel_impl(
+        user_id,
+        counterparty_node_id,
+        channel_value_satoshis as u64,
+        push_msat as u64,
+        address_opt,
+        port_opt
+    );
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeCloseChannel(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    channel_id: JString,
+    force: bool,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let channel_id: String = env.get_string(&channel_id).unwrap().into();
+
+    let result = close_channel_impl(user_id, channel_id, force);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeListChannels(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let result = list_channels_impl(user_id);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeConnectPeer(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    node_id: JString,
+    address: JString,
+    port: i32,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let node_id: String = env.get_string(&node_id).unwrap().into();
+    let address: String = env.get_string(&address).unwrap().into();
+
+    let result = connect_peer_impl(user_id, node_id, address, port as u16);
+    env.new_string(result).unwrap().into_raw()
+}
+
 // iOS C FFI bindings
 #[no_mangle]
 pub extern "C" fn wallet_initialize(
@@ -359,6 +639,113 @@ pub extern "C" fn wallet_get_events(user_id: *const c_char) -> *mut c_char {
 pub extern "C" fn wallet_disconnect(user_id: *const c_char) -> *mut c_char {
     let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
     let result = disconnect_wallet_impl(user_id);
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_create_invoice(
+    user_id: *const c_char,
+    amount_sats: i64,
+    description: *const c_char,
+    expiry_secs: i32,
+) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let amount_opt = if amount_sats > 0 { Some(amount_sats as u64) } else { None };
+    let desc = unsafe { CStr::from_ptr(description).to_str().unwrap() }.to_string();
+    let desc_opt = if desc.is_empty() { None } else { Some(desc) };
+
+    let result = create_invoice_impl(user_id, amount_opt, desc_opt, expiry_secs as u32);
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_pay_invoice(
+    user_id: *const c_char,
+    bolt11: *const c_char,
+    amount_sats: i64,
+) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let bolt11 = unsafe { CStr::from_ptr(bolt11).to_str().unwrap() }.to_string();
+    let amount_opt = if amount_sats > 0 { Some(amount_sats as u64) } else { None };
+
+    let result = pay_invoice_impl(user_id, bolt11, amount_opt);
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_send_keysend(
+    user_id: *const c_char,
+    destination_pubkey: *const c_char,
+    amount_sats: i64,
+    custom_records_json: *const c_char,
+) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let destination_pubkey = unsafe { CStr::from_ptr(destination_pubkey).to_str().unwrap() }.to_string();
+    let custom_records = unsafe { CStr::from_ptr(custom_records_json).to_str().unwrap() }.to_string();
+    let custom_records_opt = if custom_records.is_empty() { None } else { Some(custom_records) };
+
+    let result = send_keysend_impl(user_id, destination_pubkey, amount_sats as u64, custom_records_opt);
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_open_channel(
+    user_id: *const c_char,
+    counterparty_node_id: *const c_char,
+    channel_value_satoshis: i64,
+    push_msat: i64,
+    peer_address: *const c_char,
+    peer_port: i32,
+) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let counterparty_node_id = unsafe { CStr::from_ptr(counterparty_node_id).to_str().unwrap() }.to_string();
+    let address = unsafe { CStr::from_ptr(peer_address).to_str().unwrap() }.to_string();
+    let address_opt = if address.is_empty() { None } else { Some(address) };
+    let port_opt = if peer_port > 0 { Some(peer_port as u16) } else { None };
+
+    let result = open_channel_impl(
+        user_id,
+        counterparty_node_id,
+        channel_value_satoshis as u64,
+        push_msat as u64,
+        address_opt,
+        port_opt
+    );
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_close_channel(
+    user_id: *const c_char,
+    channel_id: *const c_char,
+    force: bool,
+) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let channel_id = unsafe { CStr::from_ptr(channel_id).to_str().unwrap() }.to_string();
+
+    let result = close_channel_impl(user_id, channel_id, force);
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_list_channels(user_id: *const c_char) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let result = list_channels_impl(user_id);
+    CString::new(result).unwrap().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn wallet_connect_peer(
+    user_id: *const c_char,
+    node_id: *const c_char,
+    address: *const c_char,
+    port: i32,
+) -> *mut c_char {
+    let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
+    let node_id = unsafe { CStr::from_ptr(node_id).to_str().unwrap() }.to_string();
+    let address = unsafe { CStr::from_ptr(address).to_str().unwrap() }.to_string();
+
+    let result = connect_peer_impl(user_id, node_id, address, port as u16);
     CString::new(result).unwrap().into_raw()
 }
 
