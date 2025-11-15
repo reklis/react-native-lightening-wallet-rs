@@ -27,9 +27,11 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
 
     // Native method declarations - these match the JNI implementations in Rust
     private static native String nativeInitialize(String userId, String mnemonic, String network, String dbPath);
-    private static native String nativeSync(String userId);
+    private static native String nativeGenerateMnemonic();
+    private static native String nativeSyncWallet(String userId);
     private static native String nativeGetBalance(String userId);
     private static native String nativeGetReceivingAddress(String userId);
+    private static native String nativeGetEvents(String userId);
     private static native String nativeCreateInvoice(String userId, long amountSats, String description, int expirySecs);
     private static native String nativePayInvoice(String userId, String bolt11, long amountSats);
     private static native String nativeSendKeysend(String userId, String destinationPubkey, long amountSats, String customRecordsJson);
@@ -62,13 +64,35 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void generateMnemonic(Promise promise) {
+        try {
+            String result = nativeGenerateMnemonic();
+            promise.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "generateMnemonic error", e);
+            promise.reject("GENERATE_MNEMONIC_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
     public void sync(String userId, Promise promise) {
         try {
-            String result = nativeSync(userId);
+            String result = nativeSyncWallet(userId);
             promise.resolve(result);
         } catch (Exception e) {
             Log.e(TAG, "sync error", e);
             promise.reject("SYNC_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
+    public void getEvents(String userId, Promise promise) {
+        try {
+            String result = nativeGetEvents(userId);
+            promise.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "getEvents error", e);
+            promise.reject("GET_EVENTS_ERROR", e.getMessage(), e);
         }
     }
 
