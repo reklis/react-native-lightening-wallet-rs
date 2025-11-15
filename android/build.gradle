@@ -54,7 +54,7 @@ repositories {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     // React Native will be provided by the consuming app
-    // compileOnly 'com.facebook.react:react-native:+'
+    compileOnly 'com.facebook.react:react-native:+'
 }
 
 // Task to build Rust library

@@ -1,21 +1,24 @@
 {
   "name": "reactnative-lightening-wallet-rs",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "High-performance unified Lightning wallet for React Native",
   "main": "js/index.js",
   "types": "js/index.d.ts",
+  "react-native": "js/index.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/reklis/react-native-lightening-wallet-rs.git"
   },
   "scripts": {
+    "build": "tsc js/index.ts --outDir js --declaration --skipLibCheck",
     "build:android": "cd android && ./gradlew assembleRelease",
     "build:ios": "./scripts/build-ios.sh",
     "build:rust:android": "cd rust && cargo ndk -t arm64-v8a -t armeabi-v7a -o ../android/src/main/jniLibs build --release",
     "build:rust:ios": "./scripts/build-ios.sh",
-    "build:all": "npm run build:rust:android && npm run build:rust:ios",
+    "build:all": "npm run build && npm run build:rust:android && npm run build:rust:ios",
+    "prepublishOnly": "npm run build",
     "test": "cd rust && cargo test",
-    "clean": "rm -rf android/build ios/build ios/lib ios/LighteningWallet.xcframework rust/target",
+    "clean": "rm -rf android/build ios/build ios/lib ios/LighteningWallet.xcframework rust/target js/*.js js/*.d.ts",
     "version:bump": "./scripts/version-bump.sh"
   },
   "keywords": [

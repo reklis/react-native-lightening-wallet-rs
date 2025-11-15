@@ -376,6 +376,3 @@ export default new LighteningWalletAPI();
 
 // Export class for multiple instances
 export { LighteningWalletAPI as LighteningWallet };
-
-// Export types
-export type { WalletBalance, Payment, ChannelInfo, InvoiceInfo, WalletEvent };
