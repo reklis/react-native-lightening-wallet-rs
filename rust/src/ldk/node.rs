@@ -200,6 +200,13 @@ impl LightningNode {
         let node = node_guard.as_ref()
             .ok_or(LightningError::NotInitialized)?;
 
+        // Log balances before attempting to open channel
+        let balances = node.list_balances();
+        eprintln!("[LDK] open_channel attempt - Balances: total={}, spendable={}, channel_amount={}",
+            balances.total_onchain_balance_sats,
+            balances.spendable_onchain_balance_sats,
+            params.channel_value_satoshis);
+
         let pubkey = PublicKey::from_str(&params.counterparty_node_id)
             .map_err(|e| LightningError::ChannelError(format!("Invalid pubkey: {}", e)))?;
 
@@ -219,7 +226,10 @@ impl LightningNode {
             params.channel_value_satoshis,
             Some(params.push_msat),
             None, // channel_config (use default)
-        ).map_err(|e| LightningError::ChannelError(format!("Failed to open channel: {:?}", e)))?;
+        ).map_err(|e| {
+            eprintln!("[LDK] open_channel error: {:?}", e);
+            LightningError::ChannelError(format!("Failed to open channel: {:?}", e))
+        })?;
 
         // Convert UserChannelId to hex string
         Ok(hex::encode(user_channel_id.0.to_le_bytes()))

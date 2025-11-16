@@ -90,17 +90,17 @@ fn get_balance_impl(user_id: String) -> String {
 
     if let Some(coordinator) = wallets.get(&user_id) {
         let lightning_node = coordinator.get_lightning_node();
-        match lightning_node.get_total_onchain_balance() {
-            Ok(onchain_balance) => {
+        match (lightning_node.get_total_onchain_balance(), lightning_node.get_spendable_onchain_balance()) {
+            (Ok(total_balance), Ok(spendable_balance)) => {
                 let balances = json!({
-                    "onchain_confirmed": onchain_balance,
-                    "onchain_unconfirmed": 0, // LDK doesn't expose this separately
+                    "onchain_confirmed": spendable_balance,
+                    "onchain_unconfirmed": total_balance.saturating_sub(spendable_balance),
                     "lightning_balance": 0, // TODO: Calculate from channels
-                    "total": onchain_balance
+                    "total": total_balance
                 });
                 Response::success(balances)
             }
-            Err(e) => Response::error(format!("Failed to get balance: {}", e)),
+            (Err(e), _) | (_, Err(e)) => Response::error(format!("Failed to get balance: {}", e)),
         }
     } else {
         Response::error("Wallet not initialized".to_string())
