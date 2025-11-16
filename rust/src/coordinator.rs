@@ -132,12 +132,21 @@ impl WalletCoordinator {
 
     /// Stop the Lightning node and cleanup
     pub fn disconnect(&self) -> Result<(), CoordinatorError> {
+        // Stop the Lightning node first
         self.lightning_node.stop()
             .map_err(|e| CoordinatorError::LightningError(format!("{}", e)))?;
 
+        // Clear the key manager
         let mut km = self.key_manager.lock()
             .map_err(|e| CoordinatorError::KeyError(format!("Lock error: {}", e)))?;
         *km = None;
+
+        // Delete the Lightning storage directory
+        let lightning_storage = format!("{}/lightning", self.storage_path);
+        if std::path::Path::new(&lightning_storage).exists() {
+            std::fs::remove_dir_all(&lightning_storage)
+                .map_err(|e| CoordinatorError::StorageError(format!("Failed to delete Lightning storage: {}", e)))?;
+        }
 
         Ok(())
     }
