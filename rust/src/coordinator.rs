@@ -89,8 +89,8 @@ impl WalletCoordinator {
         let lightning_storage = format!("{}/lightning", self.storage_path);
         // Convert bitcoin::Network to ldk_node::bitcoin::Network
         let (ldk_network, esplora_url) = match network {
-            BitcoinNetwork::Bitcoin => (ldk_node::bitcoin::Network::Bitcoin, "https://blockstream.info/api"),
-            BitcoinNetwork::Testnet => (ldk_node::bitcoin::Network::Testnet, "https://blockstream.info/testnet/api"),
+            BitcoinNetwork::Bitcoin => (ldk_node::bitcoin::Network::Bitcoin, "https://mempool.space/api"),
+            BitcoinNetwork::Testnet => (ldk_node::bitcoin::Network::Testnet, "https://mempool.space/testnet/api"),
             BitcoinNetwork::Signet => (ldk_node::bitcoin::Network::Signet, "https://mempool.space/signet/api"),
             BitcoinNetwork::Regtest => (ldk_node::bitcoin::Network::Regtest, "http://localhost:3000"),
             _ => return Err(CoordinatorError::LightningError("Unsupported network".to_string())),
