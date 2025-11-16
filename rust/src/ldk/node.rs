@@ -227,8 +227,10 @@ impl LightningNode {
             Some(params.push_msat),
             None, // channel_config (use default)
         ).map_err(|e| {
-            eprintln!("[LDK] open_channel error: {:?}", e);
-            LightningError::ChannelError(format!("Failed to open channel: {:?}", e))
+            // Pass through the full LDK error message so users can see fee requirements
+            let error_msg = format!("{}", e);
+            eprintln!("[LDK] open_channel error: {}", error_msg);
+            LightningError::ChannelError(error_msg)
         })?;
 
         // Convert UserChannelId to hex string
