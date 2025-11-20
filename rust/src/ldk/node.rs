@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use std::str::FromStr;
 use ldk_node::{Builder, Node as LdkNode};
+use ldk_node::config::{Config, AnchorChannelsConfig};
 use ldk_node::bitcoin::{Network, Address as BdkAddress};
 use ldk_node::bitcoin::secp256k1::PublicKey;
 use ldk_node::lightning::ln::msgs::SocketAddress;
@@ -50,24 +51,33 @@ impl LightningNode {
         entropy_64[..32].copy_from_slice(&entropy);
         entropy_64[32..].copy_from_slice(&entropy);
 
-        // Build the node using Builder methods
-        let mut builder = Builder::new();
-        builder.set_network(network);
-        builder.set_storage_dir_path(storage_path.to_string());
+        // Create config with anchor channels enabled
+        // Anchor channels allow dynamic fee bumping at close time, avoiding large upfront fee reserves
+        let mut config = ldk_node::config::default_config();
+        config.network = network;
+        config.storage_dir_path = storage_path.to_string();
+        config.listening_addresses = Some(vec![
+            SocketAddress::TcpIpV4 {
+                addr: [0, 0, 0, 0],
+                port: 9735,
+            }
+        ]);
+
+        // Enable anchor channels with default settings
+        // This solves the high commitment transaction fee reserve problem on testnet
+        config.anchor_channels_config = Some(AnchorChannelsConfig {
+            trusted_peers_no_reserve: vec![],
+            per_channel_reserve_sats: 25000, // Default reserve for anchor channels
+        });
+
+        // Build the node using the config
+        let mut builder = Builder::from_config(config);
         builder.set_entropy_seed_bytes(entropy_64);
 
         // Set Esplora server for chain data
         if let Some(esplora_url) = esplora_server {
             builder.set_chain_source_esplora(esplora_url.to_string(), None);
         }
-
-        // Set up listening address
-        let _ = builder.set_listening_addresses(vec![
-            SocketAddress::TcpIpV4 {
-                addr: [0, 0, 0, 0],
-                port: 9735,
-            }
-        ]);
 
         // Build the node
         let node = builder.build()
@@ -228,9 +238,21 @@ impl LightningNode {
             None, // channel_config (use default)
         ).map_err(|e| {
             // Pass through the full LDK error message so users can see fee requirements
-            let error_msg = format!("{}", e);
-            eprintln!("[LDK] open_channel error: {}", error_msg);
-            LightningError::ChannelError(error_msg)
+            let error_msg = format!("{:?}", e); // Use Debug format for more details
+            eprintln!("[LDK] Channel open error: {}", error_msg);
+            eprintln!("[LDK] Balances at error: total={}, spendable={}",
+                balances.total_onchain_balance_sats,
+                balances.spendable_onchain_balance_sats);
+
+            // Provide user-friendly error message
+            let user_msg = if balances.spendable_onchain_balance_sats < params.channel_value_satoshis {
+                format!("Insufficient confirmed funds. You have {} sats confirmed, but need {} sats + fees. Wait for your Bitcoin transaction to confirm.",
+                    balances.spendable_onchain_balance_sats, params.channel_value_satoshis)
+            } else {
+                format!("Failed to create channel: {}", error_msg)
+            };
+
+            LightningError::ChannelError(user_msg)
         })?;
 
         // Convert UserChannelId to hex string
