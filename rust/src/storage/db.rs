@@ -259,20 +259,6 @@ impl Database {
 
         Ok(result)
     }
-
-    #[cfg(test)]
-    pub fn get_payment_count(&self) -> Result<usize, DatabaseError> {
-        let conn = self.conn.lock()
-            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
-
-        let count: usize = conn.query_row(
-            "SELECT COUNT(*) FROM payments",
-            [],
-            |row| row.get(0),
-        )?;
-
-        Ok(count)
-    }
 }
 
 #[cfg(test)]
