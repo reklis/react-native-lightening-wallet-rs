@@ -149,6 +149,7 @@ export class LighteningWalletAPI {
 
   /**
    * Sync the wallet with the blockchain
+   * Note: Payment history is synced automatically in the background
    */
   async sync(): Promise<{ synced: boolean }> {
     if (!this.userId) {

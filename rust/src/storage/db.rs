@@ -1,5 +1,4 @@
 use rusqlite::Connection;
-#[cfg(test)]
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -101,7 +100,7 @@ impl Database {
         Ok(())
     }
 
-    #[cfg(test)]
+    /// Insert a new payment into the database
     pub fn insert_payment(&self, payment: &Payment) -> Result<i64, DatabaseError> {
         let conn = self.conn.lock()
             .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
@@ -127,6 +126,59 @@ impl Database {
         )?;
 
         Ok(conn.last_insert_rowid())
+    }
+
+    /// Upsert a payment - insert if new, update if exists (based on payment_hash)
+    /// This is used during sync to update payment status and details from the network
+    pub fn upsert_payment(&self, payment: &Payment) -> Result<(), DatabaseError> {
+        let conn = self.conn.lock()
+            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
+
+        conn.execute(
+            "INSERT INTO payments (
+                payment_hash, payment_type, amount_sats, fee_sats, status,
+                timestamp, description, destination, txid, preimage, bolt11
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            ON CONFLICT(payment_hash) DO UPDATE SET
+                payment_type = excluded.payment_type,
+                amount_sats = excluded.amount_sats,
+                fee_sats = excluded.fee_sats,
+                status = excluded.status,
+                description = excluded.description,
+                destination = excluded.destination,
+                txid = excluded.txid,
+                preimage = excluded.preimage,
+                bolt11 = excluded.bolt11",
+            params![
+                payment.payment_hash,
+                payment.payment_type,
+                payment.amount_sats,
+                payment.fee_sats,
+                payment.status,
+                payment.timestamp,
+                payment.description,
+                payment.destination,
+                payment.txid,
+                payment.preimage,
+                payment.bolt11,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    /// Get count of payments in the database
+    pub fn get_payment_count(&self) -> Result<i64, DatabaseError> {
+        let conn = self.conn.lock()
+            .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
+
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM payments",
+            [],
+            |row| row.get(0)
+        )?;
+
+        Ok(count)
     }
 
     #[cfg(test)]

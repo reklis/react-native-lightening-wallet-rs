@@ -1,7 +1,7 @@
 mod node;
 mod channels;
 mod invoices;
-mod payments;
+pub mod payments;
 mod peers;
 
 #[allow(dead_code)]
@@ -10,7 +10,7 @@ pub mod podcasting;
 pub use node::LightningNode;
 pub use channels::{ChannelInfo, OpenChannelParams, CloseChannelParams};
 pub use invoices::{InvoiceInfo, CreateInvoiceParams};
-pub use payments::{PaymentInfo, PayInvoiceParams, KeysendParams, SendOnChainParams};
+pub use payments::{PaymentInfo, PayInvoiceParams, KeysendParams, SendOnChainParams, PaymentType, PaymentStatus};
 pub use peers::{PeerInfo, ConnectPeerParams};
 
 use thiserror::Error;

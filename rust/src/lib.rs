@@ -112,6 +112,7 @@ fn sync_wallet_impl(user_id: String) -> String {
     let wallets = WALLETS.lock().unwrap();
 
     if let Some(coordinator) = wallets.get(&user_id) {
+        // Sync blockchain data (payment sync happens automatically in background)
         match coordinator.sync() {
             Ok(_) => Response::success(json!({ "synced": true })),
             Err(e) => Response::error(format!("Sync failed: {}", e)),
