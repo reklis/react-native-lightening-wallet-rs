@@ -144,6 +144,7 @@ impl Database {
                 amount_sats = excluded.amount_sats,
                 fee_sats = excluded.fee_sats,
                 status = excluded.status,
+                timestamp = CASE WHEN payments.timestamp = 0 THEN excluded.timestamp ELSE payments.timestamp END,
                 description = excluded.description,
                 destination = excluded.destination,
                 txid = excluded.txid,
