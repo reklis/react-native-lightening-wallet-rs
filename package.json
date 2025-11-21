@@ -1,6 +1,6 @@
 {
   "name": "reactnative-lightening-wallet-rs",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "description": "High-performance unified Lightning wallet for React Native",
   "main": "js/index.js",
   "types": "js/index.d.ts",
