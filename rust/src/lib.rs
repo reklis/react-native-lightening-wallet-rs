@@ -69,6 +69,7 @@ fn initialize_wallet_impl(user_id: String, mnemonic: String, network: String, db
     let network = match network.as_str() {
         "bitcoin" => Network::Bitcoin,
         "testnet" | "bitcoinTestnet" => Network::Testnet,
+        "regtest" => Network::Regtest,
         _ => return Response::error("Invalid network".to_string()),
     };
 
@@ -108,11 +109,22 @@ fn get_balance_impl(user_id: String) -> String {
         let lightning_node = coordinator.get_lightning_node();
         match (lightning_node.get_total_onchain_balance(), lightning_node.get_spendable_onchain_balance()) {
             (Ok(total_balance), Ok(spendable_balance)) => {
+                // Calculate Lightning balance from active channels
+                let lightning_balance = match lightning_node.list_channels() {
+                    Ok(channels) => {
+                        channels.iter()
+                            .filter(|ch| ch.is_ready && !ch.is_closing)
+                            .map(|ch| ch.balance_sats)
+                            .sum::<u64>()
+                    },
+                    Err(_) => 0,
+                };
+
                 let balances = json!({
                     "onchain_confirmed": spendable_balance,
                     "onchain_unconfirmed": total_balance.saturating_sub(spendable_balance),
-                    "lightning_balance": 0, // TODO: Calculate from channels
-                    "total": total_balance
+                    "lightning_balance": lightning_balance,
+                    "total": total_balance + lightning_balance
                 });
                 Response::success(balances)
             }
@@ -263,6 +275,26 @@ fn send_keysend_impl(user_id: String, destination_pubkey: String, amount_sats: u
         match lightning_node.send_keysend(params) {
             Ok(payment) => Response::success(serde_json::to_value(payment).unwrap()),
             Err(e) => Response::error(format!("Failed to send keysend: {}", e)),
+        }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Send on-chain Bitcoin transaction
+fn send_onchain_impl(user_id: String, address: String, amount_sats: u64) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(coordinator) = wallets.get(&user_id) {
+        let lightning_node = coordinator.get_lightning_node();
+        let params = ldk::SendOnChainParams {
+            address,
+            amount_sats,
+            fee_rate_sat_per_vbyte: 1, // Default to 1 sat/vbyte for regtest
+        };
+        match lightning_node.send_onchain(params) {
+            Ok(txid) => Response::success(json!({ "txid": txid })),
+            Err(e) => Response::error(format!("Failed to send on-chain: {}", e)),
         }
     } else {
         Response::error("Wallet not initialized".to_string())
@@ -508,6 +540,22 @@ pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_na
     let custom_records_opt = if custom_records.is_empty() { None } else { Some(custom_records) };
 
     let result = send_keysend_impl(user_id, destination_pubkey, amount_sats as u64, custom_records_opt);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeSendOnchain(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    address: JString,
+    amount_sats: i64,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let address: String = env.get_string(&address).unwrap().into();
+
+    let result = send_onchain_impl(user_id, address, amount_sats as u64);
     env.new_string(result).unwrap().into_raw()
 }
 

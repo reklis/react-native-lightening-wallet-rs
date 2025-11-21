@@ -35,6 +35,7 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     private static native String nativeCreateInvoice(String userId, long amountSats, String description, int expirySecs);
     private static native String nativePayInvoice(String userId, String bolt11, long amountSats);
     private static native String nativeSendKeysend(String userId, String destinationPubkey, long amountSats, String customRecordsJson);
+    private static native String nativeSendOnchain(String userId, String address, long amountSats);
     private static native String nativeListPayments(String userId, int limit, int offset);
     private static native String nativeOpenChannel(String userId, String counterpartyNodeId, long channelValueSatoshis, long pushMsat, String peerAddress, int peerPort);
     private static native String nativeCloseChannel(String userId, String channelId, boolean force);
@@ -152,6 +153,18 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
         } catch (Exception e) {
             Log.e(TAG, "sendKeysend error", e);
             promise.reject("SEND_KEYSEND_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
+    public void sendOnchain(String userId, String address, double amountSats, Promise promise) {
+        try {
+            long amount = (long) amountSats;
+            String result = nativeSendOnchain(userId, address, amount);
+            promise.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "sendOnchain error", e);
+            promise.reject("SEND_ONCHAIN_ERROR", e.getMessage(), e);
         }
     }
 

@@ -97,7 +97,7 @@ impl WalletCoordinator {
             BitcoinNetwork::Bitcoin => (ldk_node::bitcoin::Network::Bitcoin, "https://mempool.space/api"),
             BitcoinNetwork::Testnet => (ldk_node::bitcoin::Network::Testnet, "https://mempool.space/testnet/api"),
             BitcoinNetwork::Signet => (ldk_node::bitcoin::Network::Signet, "https://mempool.space/signet/api"),
-            BitcoinNetwork::Regtest => (ldk_node::bitcoin::Network::Regtest, "http://localhost:3000"),
+            BitcoinNetwork::Regtest => (ldk_node::bitcoin::Network::Regtest, "http://192.168.1.190:3000"),
             _ => return Err(CoordinatorError::LightningError("Unsupported network".to_string())),
         };
         self.lightning_node.initialize(
