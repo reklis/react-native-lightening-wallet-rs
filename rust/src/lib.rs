@@ -107,37 +107,27 @@ fn get_balance_impl(user_id: String) -> String {
 
     if let Some(coordinator) = wallets.get(&user_id) {
         let lightning_node = coordinator.get_lightning_node();
-        match (
-            lightning_node.get_total_onchain_balance(),
-            lightning_node.get_spendable_onchain_balance(),
-            lightning_node.get_pending_sweep_balance()
-        ) {
-            (Ok(total_balance), Ok(spendable_balance), Ok(pending_sweep)) => {
-                // Calculate Lightning balance from active channels
-                let lightning_balance = match lightning_node.list_channels() {
-                    Ok(channels) => {
-                        channels.iter()
-                            .filter(|ch| ch.is_ready && !ch.is_closing)
-                            .map(|ch| ch.balance_sats)
-                            .sum::<u64>()
-                    },
-                    Err(_) => 0,
-                };
 
-                // Include pending sweep balance in total
-                // These are funds from closed channels being swept back to on-chain wallet
-                let total_with_pending = total_balance + pending_sweep;
+        // Get all balances in a single call to list_balances()
+        match lightning_node.get_all_balances() {
+            Ok((total_onchain, spendable_onchain, pending_broadcast, broadcast_awaiting, awaiting_threshold, lightning_balance)) => {
+                // Calculate totals
+                let pending_sweep_total = pending_broadcast + broadcast_awaiting + awaiting_threshold;
+                let total_with_pending = total_onchain + pending_sweep_total;
 
                 let balances = json!({
-                    "onchain_confirmed": spendable_balance,
-                    "onchain_unconfirmed": total_balance.saturating_sub(spendable_balance),
-                    "pending_sweep_balance": pending_sweep,
+                    "onchain_confirmed": spendable_onchain,
+                    "onchain_unconfirmed": total_onchain.saturating_sub(spendable_onchain),
+                    "pending_sweep_balance": pending_sweep_total,
+                    "pending_sweep_pending_broadcast": pending_broadcast,
+                    "pending_sweep_broadcast_awaiting_confirmation": broadcast_awaiting,
+                    "pending_sweep_awaiting_threshold_confirmations": awaiting_threshold,
                     "lightning_balance": lightning_balance,
                     "total": total_with_pending + lightning_balance
                 });
                 Response::success(balances)
             }
-            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Response::error(format!("Failed to get balance: {}", e)),
+            Err(e) => Response::error(format!("Failed to get balance: {}", e)),
         }
     } else {
         Response::error("Wallet not initialized".to_string())

@@ -605,6 +605,75 @@ impl LightningNode {
 
         Ok(pending_total)
     }
+
+    pub fn get_pending_sweep_balances_breakdown(&self) -> Result<(u64, u64, u64), LightningError> {
+        let node_guard = self.node.lock()
+            .map_err(|e| LightningError::LdkError(format!("Lock error: {}", e)))?;
+
+        let node = node_guard.as_ref()
+            .ok_or(LightningError::NotInitialized)?;
+
+        let balances = node.list_balances();
+
+        let mut pending_broadcast = 0u64;
+        let mut broadcast_awaiting_conf = 0u64;
+        let mut awaiting_threshold_conf = 0u64;
+
+        for balance in &balances.pending_balances_from_channel_closures {
+            match balance {
+                ldk_node::PendingSweepBalance::PendingBroadcast { amount_satoshis, .. } => {
+                    pending_broadcast += amount_satoshis;
+                }
+                ldk_node::PendingSweepBalance::BroadcastAwaitingConfirmation { amount_satoshis, .. } => {
+                    broadcast_awaiting_conf += amount_satoshis;
+                }
+                ldk_node::PendingSweepBalance::AwaitingThresholdConfirmations { amount_satoshis, .. } => {
+                    awaiting_threshold_conf += amount_satoshis;
+                }
+            }
+        }
+
+        Ok((pending_broadcast, broadcast_awaiting_conf, awaiting_threshold_conf))
+    }
+
+    // Get all balance info in one call to list_balances()
+    pub fn get_all_balances(&self) -> Result<(u64, u64, u64, u64, u64, u64), LightningError> {
+        let node_guard = self.node.lock()
+            .map_err(|e| LightningError::LdkError(format!("Lock error: {}", e)))?;
+
+        let node = node_guard.as_ref()
+            .ok_or(LightningError::NotInitialized)?;
+
+        // Call list_balances ONCE
+        let balances = node.list_balances();
+
+        // Extract on-chain balances
+        let total_onchain = balances.total_onchain_balance_sats;
+        let spendable_onchain = balances.spendable_onchain_balance_sats;
+
+        // Calculate pending sweep breakdown
+        let mut pending_broadcast = 0u64;
+        let mut broadcast_awaiting_conf = 0u64;
+        let mut awaiting_threshold_conf = 0u64;
+
+        for balance in &balances.pending_balances_from_channel_closures {
+            match balance {
+                ldk_node::PendingSweepBalance::PendingBroadcast { amount_satoshis, .. } => {
+                    pending_broadcast += amount_satoshis;
+                }
+                ldk_node::PendingSweepBalance::BroadcastAwaitingConfirmation { amount_satoshis, .. } => {
+                    broadcast_awaiting_conf += amount_satoshis;
+                }
+                ldk_node::PendingSweepBalance::AwaitingThresholdConfirmations { amount_satoshis, .. } => {
+                    awaiting_threshold_conf += amount_satoshis;
+                }
+            }
+        }
+
+        // Return: (total_onchain, spendable_onchain, pending_broadcast, broadcast_awaiting, awaiting_threshold, lightning_balance)
+        // Note: lightning_balance will be calculated from channels separately
+        Ok((total_onchain, spendable_onchain, pending_broadcast, broadcast_awaiting_conf, awaiting_threshold_conf, balances.total_lightning_balance_sats))
+    }
 }
 
 impl Default for LightningNode {
