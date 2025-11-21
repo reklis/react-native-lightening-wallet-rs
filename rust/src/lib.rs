@@ -107,8 +107,12 @@ fn get_balance_impl(user_id: String) -> String {
 
     if let Some(coordinator) = wallets.get(&user_id) {
         let lightning_node = coordinator.get_lightning_node();
-        match (lightning_node.get_total_onchain_balance(), lightning_node.get_spendable_onchain_balance()) {
-            (Ok(total_balance), Ok(spendable_balance)) => {
+        match (
+            lightning_node.get_total_onchain_balance(),
+            lightning_node.get_spendable_onchain_balance(),
+            lightning_node.get_pending_sweep_balance()
+        ) {
+            (Ok(total_balance), Ok(spendable_balance), Ok(pending_sweep)) => {
                 // Calculate Lightning balance from active channels
                 let lightning_balance = match lightning_node.list_channels() {
                     Ok(channels) => {
@@ -120,15 +124,20 @@ fn get_balance_impl(user_id: String) -> String {
                     Err(_) => 0,
                 };
 
+                // Include pending sweep balance in total
+                // These are funds from closed channels being swept back to on-chain wallet
+                let total_with_pending = total_balance + pending_sweep;
+
                 let balances = json!({
                     "onchain_confirmed": spendable_balance,
                     "onchain_unconfirmed": total_balance.saturating_sub(spendable_balance),
+                    "pending_sweep_balance": pending_sweep,
                     "lightning_balance": lightning_balance,
-                    "total": total_balance + lightning_balance
+                    "total": total_with_pending + lightning_balance
                 });
                 Response::success(balances)
             }
-            (Err(e), _) | (_, Err(e)) => Response::error(format!("Failed to get balance: {}", e)),
+            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Response::error(format!("Failed to get balance: {}", e)),
         }
     } else {
         Response::error("Wallet not initialized".to_string())

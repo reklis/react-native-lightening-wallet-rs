@@ -581,6 +581,30 @@ impl LightningNode {
         let balances = node.list_balances();
         Ok(balances.total_onchain_balance_sats)
     }
+
+    pub fn get_pending_sweep_balance(&self) -> Result<u64, LightningError> {
+        let node_guard = self.node.lock()
+            .map_err(|e| LightningError::LdkError(format!("Lock error: {}", e)))?;
+
+        let node = node_guard.as_ref()
+            .ok_or(LightningError::NotInitialized)?;
+
+        let balances = node.list_balances();
+
+        // Sum up all pending balances from channel closures
+        let pending_total: u64 = balances.pending_balances_from_channel_closures
+            .iter()
+            .map(|balance| {
+                match balance {
+                    ldk_node::PendingSweepBalance::PendingBroadcast { amount_satoshis, .. } => *amount_satoshis,
+                    ldk_node::PendingSweepBalance::BroadcastAwaitingConfirmation { amount_satoshis, .. } => *amount_satoshis,
+                    ldk_node::PendingSweepBalance::AwaitingThresholdConfirmations { amount_satoshis, .. } => *amount_satoshis,
+                }
+            })
+            .sum();
+
+        Ok(pending_total)
+    }
 }
 
 impl Default for LightningNode {
