@@ -25,10 +25,11 @@ export interface WalletBalance {
   onchain_confirmed: number;
   onchain_unconfirmed: number;
   lightning_balance: number;
-  lightning_receivable: number;
-  claimable_balance: number;
+  pending_sweep_balance: number;
+  pending_sweep_pending_broadcast: number;
+  pending_sweep_broadcast_awaiting_confirmation: number;
+  pending_sweep_awaiting_threshold_confirmations: number;
   total: number;
-  pending: number;
 }
 
 export interface Payment {
