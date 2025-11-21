@@ -230,6 +230,14 @@ fn create_invoice_impl(user_id: String, amount_sats: Option<u64>, description: O
     }
 }
 
+// Decode Lightning invoice
+fn decode_invoice_impl(bolt11: String) -> String {
+    match ldk::LightningNode::decode_invoice(&bolt11) {
+        Ok(invoice_info) => Response::success(serde_json::to_value(invoice_info).unwrap()),
+        Err(e) => Response::error(format!("Failed to decode invoice: {}", e)),
+    }
+}
+
 // Pay Lightning invoice
 fn pay_invoice_impl(user_id: String, bolt11: String, amount_sats: Option<u64>) -> String {
     let wallets = WALLETS.lock().unwrap();
@@ -276,6 +284,35 @@ fn send_keysend_impl(user_id: String, destination_pubkey: String, amount_sats: u
             Ok(payment) => Response::success(serde_json::to_value(payment).unwrap()),
             Err(e) => Response::error(format!("Failed to send keysend: {}", e)),
         }
+    } else {
+        Response::error("Wallet not initialized".to_string())
+    }
+}
+
+// Estimate on-chain transaction fee
+fn estimate_onchain_fee_impl(user_id: String, address: String, amount_sats: u64) -> String {
+    let wallets = WALLETS.lock().unwrap();
+
+    if let Some(_coordinator) = wallets.get(&user_id) {
+        // Estimate transaction size
+        // A typical P2WPKH transaction has:
+        // - 1-2 inputs: ~68 vbytes each
+        // - 2 outputs (recipient + change): ~31 vbytes each
+        // - Base overhead: ~10.5 vbytes
+        // Conservative estimate: assume 2 inputs
+        let estimated_vbytes: f64 = 10.5 + (2.0 * 68.0) + (2.0 * 31.0); // ~208.5 vbytes
+
+        // Use 1 sat/vbyte for regtest, could make this configurable
+        let fee_rate: f64 = 1.0;
+        let estimated_fee = (estimated_vbytes * fee_rate).ceil() as u64;
+
+        Response::success(json!({
+            "address": address,
+            "amount_sats": amount_sats,
+            "estimated_fee_sats": estimated_fee,
+            "fee_rate_sat_per_vbyte": fee_rate,
+            "estimated_vbytes": estimated_vbytes as u64
+        }))
     } else {
         Response::error("Wallet not initialized".to_string())
     }
@@ -509,6 +546,18 @@ pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_na
 
 #[cfg(target_os = "android")]
 #[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeDecodeInvoice(
+    mut env: JNIEnv,
+    _: JClass,
+    bolt11: JString,
+) -> jstring {
+    let bolt11: String = env.get_string(&bolt11).unwrap().into();
+    let result = decode_invoice_impl(bolt11);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
 pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativePayInvoice(
     mut env: JNIEnv,
     _: JClass,
@@ -540,6 +589,22 @@ pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_na
     let custom_records_opt = if custom_records.is_empty() { None } else { Some(custom_records) };
 
     let result = send_keysend_impl(user_id, destination_pubkey, amount_sats as u64, custom_records_opt);
+    env.new_string(result).unwrap().into_raw()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_nativeEstimateOnchainFee(
+    mut env: JNIEnv,
+    _: JClass,
+    user_id: JString,
+    address: JString,
+    amount_sats: i64,
+) -> jstring {
+    let user_id: String = env.get_string(&user_id).unwrap().into();
+    let address: String = env.get_string(&address).unwrap().into();
+
+    let result = estimate_onchain_fee_impl(user_id, address, amount_sats as u64);
     env.new_string(result).unwrap().into_raw()
 }
 

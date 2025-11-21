@@ -310,8 +310,10 @@ impl LightningNode {
         let channel_details = node.list_channels();
 
         let channels: Vec<ChannelInfo> = channel_details.iter().map(|channel| {
+            // Use user_channel_id instead of channel_id for closing channels
+            let user_channel_id_bytes = channel.user_channel_id.0.to_le_bytes();
             ChannelInfo {
-                channel_id: hex::encode(channel.channel_id.0),
+                channel_id: hex::encode(user_channel_id_bytes),
                 counterparty_node_id: channel.counterparty_node_id.to_string(),
                 channel_value_sats: channel.channel_value_sats,
                 balance_sats: channel.outbound_capacity_msat / 1000,
@@ -363,6 +365,35 @@ impl LightningNode {
             description: params.description,
             created_at: timestamp,
             expires_at: timestamp + params.expiry_secs as u64,
+        })
+    }
+
+    /// Decode a BOLT11 invoice and extract its information
+    pub fn decode_invoice(bolt11: &str) -> Result<InvoiceInfo, LightningError> {
+        let invoice = Bolt11Invoice::from_str(bolt11)
+            .map_err(|e| LightningError::InvoiceError(format!("Invalid invoice: {}", e)))?;
+
+        let timestamp = invoice.timestamp().duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| LightningError::InvoiceError(format!("Invalid timestamp: {}", e)))?
+            .as_secs();
+
+        let amount_sats = invoice.amount_milli_satoshis().map(|msat| msat / 1000);
+
+        // Extract description from invoice
+        let description_str = match invoice.description() {
+            ldk_node::lightning_invoice::Bolt11InvoiceDescriptionRef::Direct(desc) => Some(desc.to_string()),
+            ldk_node::lightning_invoice::Bolt11InvoiceDescriptionRef::Hash(_) => None,
+        };
+
+        let expiry_secs = invoice.expiry_time().as_secs();
+
+        Ok(InvoiceInfo {
+            bolt11: bolt11.to_string(),
+            payment_hash: hex::encode(invoice.payment_hash().as_ref() as &[u8]),
+            amount_sats,
+            description: description_str,
+            created_at: timestamp,
+            expires_at: timestamp + expiry_secs,
         })
     }
 

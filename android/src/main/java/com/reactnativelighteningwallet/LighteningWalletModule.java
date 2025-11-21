@@ -33,8 +33,10 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     private static native String nativeGetReceivingAddress(String userId);
     private static native String nativeGetEvents(String userId);
     private static native String nativeCreateInvoice(String userId, long amountSats, String description, int expirySecs);
+    private static native String nativeDecodeInvoice(String bolt11);
     private static native String nativePayInvoice(String userId, String bolt11, long amountSats);
     private static native String nativeSendKeysend(String userId, String destinationPubkey, long amountSats, String customRecordsJson);
+    private static native String nativeEstimateOnchainFee(String userId, String address, long amountSats);
     private static native String nativeSendOnchain(String userId, String address, long amountSats);
     private static native String nativeListPayments(String userId, int limit, int offset);
     private static native String nativeOpenChannel(String userId, String counterpartyNodeId, long channelValueSatoshis, long pushMsat, String peerAddress, int peerPort);
@@ -133,6 +135,17 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public void decodeInvoice(String bolt11, Promise promise) {
+        try {
+            String result = nativeDecodeInvoice(bolt11);
+            promise.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "decodeInvoice error", e);
+            promise.reject("DECODE_INVOICE_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
     public void payInvoice(String userId, String bolt11, double amountSats, Promise promise) {
         try {
             long amount = amountSats < 0 ? -1 : (long) amountSats;
@@ -153,6 +166,18 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
         } catch (Exception e) {
             Log.e(TAG, "sendKeysend error", e);
             promise.reject("SEND_KEYSEND_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
+    public void estimateOnchainFee(String userId, String address, double amountSats, Promise promise) {
+        try {
+            long amount = (long) amountSats;
+            String result = nativeEstimateOnchainFee(userId, address, amount);
+            promise.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "estimateOnchainFee error", e);
+            promise.reject("ESTIMATE_ONCHAIN_FEE_ERROR", e.getMessage(), e);
         }
     }
 

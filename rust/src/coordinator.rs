@@ -305,12 +305,11 @@ impl WalletCoordinator {
             .map_err(|e| CoordinatorError::KeyError(format!("Lock error: {}", e)))?;
         *km = None;
 
-        // Delete the Lightning storage directory
-        let lightning_storage = format!("{}/lightning", self.storage_path);
-        if std::path::Path::new(&lightning_storage).exists() {
-            std::fs::remove_dir_all(&lightning_storage)
-                .map_err(|e| CoordinatorError::StorageError(format!("Failed to delete Lightning storage: {}", e)))?;
-        }
+        // NOTE: We do NOT delete the Lightning storage directory here!
+        // The Lightning directory contains critical channel state that must persist
+        // across app restarts and wallet reconnections. Channels cannot be recovered
+        // from seed alone - the channel database must be preserved.
+        // Only delete this directory when explicitly resetting the wallet.
 
         Ok(())
     }

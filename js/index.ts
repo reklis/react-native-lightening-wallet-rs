@@ -106,6 +106,7 @@ function parseResponse<T>(jsonString: string): T {
 export class LighteningWalletAPI {
   private userId: string | null = null;
   private eventEmitter = new NativeEventEmitter(LighteningWallet);
+  private eventPollingInterval: NodeJS.Timeout | null = null;
 
   /**
    * Initialize a wallet for a user
@@ -124,6 +125,7 @@ export class LighteningWalletAPI {
     );
     const data = parseResponse<{ userId: string; initialized: boolean }>(result);
     this.userId = userId;
+    this.startEventPolling();
     return data;
   }
 
@@ -209,12 +211,43 @@ export class LighteningWalletAPI {
   }
 
   /**
+   * Start polling for wallet events
+   */
+  private startEventPolling(): void {
+    if (this.eventPollingInterval) {
+      return; // Already polling
+    }
+
+    this.eventPollingInterval = setInterval(async () => {
+      try {
+        const events = await this.getEvents();
+        events.forEach((event) => {
+          this.eventEmitter.emit('WalletEvent', event);
+        });
+      } catch (error) {
+        console.error('Error polling events:', error);
+      }
+    }, 1000); // Poll every second
+  }
+
+  /**
+   * Stop polling for wallet events
+   */
+  private stopEventPolling(): void {
+    if (this.eventPollingInterval) {
+      clearInterval(this.eventPollingInterval);
+      this.eventPollingInterval = null;
+    }
+  }
+
+  /**
    * Disconnect and cleanup the wallet
    */
   async disconnect(): Promise<{ disconnected: boolean }> {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
+    this.stopEventPolling();
     const result = await LighteningWallet.disconnect(this.userId);
     const data = parseResponse<{ disconnected: boolean }>(result);
     this.userId = null;
@@ -238,6 +271,14 @@ export class LighteningWalletAPI {
       description || '',
       expirySecs || 3600
     );
+    return parseResponse<InvoiceInfo>(result);
+  }
+
+  /**
+   * Decode a Lightning invoice to extract its information
+   */
+  static async decodeInvoice(bolt11: string): Promise<InvoiceInfo> {
+    const result = await LighteningWallet.decodeInvoice(bolt11);
     return parseResponse<InvoiceInfo>(result);
   }
 
@@ -284,6 +325,54 @@ export class LighteningWalletAPI {
       customRecordsJson
     );
     return parseResponse<Payment>(result);
+  }
+
+  /**
+   * Estimate fee for an on-chain Bitcoin transaction
+   */
+  async estimateOnchainFee(
+    address: string,
+    amountSats: number
+  ): Promise<{
+    address: string;
+    amount_sats: number;
+    estimated_fee_sats: number;
+    fee_rate_sat_per_vbyte: number;
+    estimated_vbytes: number;
+  }> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const result = await LighteningWallet.estimateOnchainFee(
+      this.userId,
+      address,
+      amountSats
+    );
+    return parseResponse<{
+      address: string;
+      amount_sats: number;
+      estimated_fee_sats: number;
+      fee_rate_sat_per_vbyte: number;
+      estimated_vbytes: number;
+    }>(result);
+  }
+
+  /**
+   * Send an on-chain Bitcoin transaction
+   */
+  async sendOnchain(
+    address: string,
+    amountSats: number
+  ): Promise<{ txid: string }> {
+    if (!this.userId) {
+      throw new Error('Wallet not initialized');
+    }
+    const result = await LighteningWallet.sendOnchain(
+      this.userId,
+      address,
+      amountSats
+    );
+    return parseResponse<{ txid: string }>(result);
   }
 
   /**
