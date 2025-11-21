@@ -57,18 +57,34 @@ impl Response {
 
 // Initialize wallet
 fn initialize_wallet_impl(user_id: String, mnemonic: String, network: String, db_path: String) -> String {
+    // Check if wallet is already initialized to prevent duplicate instances
+    {
+        let wallets = WALLETS.lock().unwrap();
+        if wallets.contains_key(&user_id) {
+            eprintln!("[INIT] Wallet already initialized for user {}, returning existing instance", user_id);
+            return Response::success(json!({ "userId": user_id, "initialized": true, "existing": true }));
+        }
+    }
+
     let network = match network.as_str() {
         "bitcoin" => Network::Bitcoin,
         "testnet" | "bitcoinTestnet" => Network::Testnet,
         _ => return Response::error("Invalid network".to_string()),
     };
 
+    eprintln!("[INIT] Creating new wallet for user {}", user_id);
     match WalletCoordinator::new(&db_path) {
         Ok(coordinator) => {
             match coordinator.initialize(&mnemonic, network) {
                 Ok(_) => {
                     let mut wallets = WALLETS.lock().unwrap();
+                    // Double-check in case another thread initialized while we were creating
+                    if wallets.contains_key(&user_id) {
+                        eprintln!("[INIT] Wallet was initialized by another thread, using that instance");
+                        return Response::success(json!({ "userId": user_id, "initialized": true, "existing": true }));
+                    }
                     wallets.insert(user_id.clone(), Arc::new(coordinator));
+                    eprintln!("[INIT] Wallet initialized successfully for user {}", user_id);
                     Response::success(json!({ "userId": user_id, "initialized": true }))
                 }
                 Err(e) => Response::error(format!("Initialization failed: {}", e)),

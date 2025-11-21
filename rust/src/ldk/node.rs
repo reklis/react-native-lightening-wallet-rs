@@ -70,6 +70,9 @@ impl LightningNode {
             per_channel_reserve_sats: 25000, // Default reserve for anchor channels
         });
 
+        eprintln!("[LDK INIT] Anchor channels config set: {:?}", config.anchor_channels_config.is_some());
+        eprintln!("[LDK INIT] Network: {:?}", config.network);
+
         // Build the node using the config
         let mut builder = Builder::from_config(config);
         builder.set_entropy_seed_bytes(entropy_64);
