@@ -51,8 +51,6 @@ impl LightningNode {
         entropy_64[..32].copy_from_slice(&entropy);
         entropy_64[32..].copy_from_slice(&entropy);
 
-        // Create config with anchor channels enabled
-        // Anchor channels allow dynamic fee bumping at close time, avoiding large upfront fee reserves
         let mut config = ldk_node::config::default_config();
         config.network = network;
         config.storage_dir_path = storage_path.to_string();
@@ -63,11 +61,10 @@ impl LightningNode {
             }
         ]);
 
-        // Disable anchor channels - use static remote key channels instead
-        // Anchor channels create small uneconomical outputs that can't be swept
+        // Use static remote key channels
         config.anchor_channels_config = None;
 
-        eprintln!("[LDK INIT] Using static remote key channels (anchor channels disabled)");
+        eprintln!("[LDK INIT] Using static remote key channels");
         eprintln!("[LDK INIT] Network: {:?}", config.network);
 
         // Build the node using the config
