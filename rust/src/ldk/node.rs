@@ -233,11 +233,12 @@ impl LightningNode {
         };
 
         // Open channel - new signature: open_channel(pubkey, address, amount_sats, push_msat, config)
+        // Use None for push_msat and config to use LDK defaults
         let user_channel_id = node.open_channel(
             pubkey,
             socket_address,
             params.channel_value_satoshis,
-            Some(params.push_msat),
+            None, // push_msat (use default)
             None, // channel_config (use default)
         ).map_err(|e| {
             // Pass through the full LDK error message so users can see fee requirements
