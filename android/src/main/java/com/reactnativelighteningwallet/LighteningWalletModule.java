@@ -38,7 +38,7 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     private static native String nativeSendKeysend(String userId, String destinationPubkey, long amountSats, String customRecordsJson);
     private static native String nativeEstimateOnchainFee(String userId, String address, long amountSats);
     private static native String nativeSendOnchain(String userId, String address, long amountSats);
-    private static native String nativeListPayments(String userId, int limit, int offset);
+    private static native String nativeListPayments(String userId, int limit, int offset, String statusFilter);
     private static native String nativeOpenChannel(String userId, String counterpartyNodeId, long channelValueSatoshis, long pushMsat, String peerAddress, int peerPort);
     private static native String nativeCloseChannel(String userId, String channelId, boolean force);
     private static native String nativeListChannels(String userId);
@@ -194,11 +194,11 @@ public class LighteningWalletModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void listPayments(String userId, double limit, double offset, Promise promise) {
+    public void listPayments(String userId, double limit, double offset, String statusFilter, Promise promise) {
         try {
             int limitInt = (int) limit;
             int offsetInt = (int) offset;
-            String result = nativeListPayments(userId, limitInt, offsetInt);
+            String result = nativeListPayments(userId, limitInt, offsetInt, statusFilter != null ? statusFilter : "");
             promise.resolve(result);
         } catch (Exception e) {
             Log.e(TAG, "listPayments error", e);

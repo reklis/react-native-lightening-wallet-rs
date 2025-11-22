@@ -168,12 +168,12 @@ fn get_receiving_address_impl(user_id: String) -> String {
 }
 
 // List payments
-fn list_payments_impl(user_id: String, limit: Option<usize>, offset: Option<usize>) -> String {
+fn list_payments_impl(user_id: String, limit: Option<usize>, offset: Option<usize>, status_filter: Option<String>) -> String {
     let wallets = WALLETS.lock().unwrap();
 
     if let Some(coordinator) = wallets.get(&user_id) {
         let db = coordinator.get_database();
-        match db.list_payments(limit, offset) {
+        match db.list_payments(limit, offset, status_filter) {
             Ok(payments) => Response::success(serde_json::to_value(payments).unwrap()),
             Err(e) => Response::error(format!("Failed to list payments: {}", e)),
         }
@@ -493,13 +493,26 @@ pub extern "C" fn Java_com_reactnativelighteningwallet_LighteningWalletModule_na
     user_id: JString,
     limit: i32,
     offset: i32,
+    status_filter: JString,
 ) -> jstring {
     let user_id: String = env.get_string(&user_id).unwrap().into();
 
     let limit_opt = if limit > 0 { Some(limit as usize) } else { None };
     let offset_opt = if offset > 0 { Some(offset as usize) } else { None };
 
-    let result = list_payments_impl(user_id, limit_opt, offset_opt);
+    // Parse status filter - empty string means no filter
+    let status_filter_opt = if status_filter.is_null() {
+        None
+    } else {
+        let status_str: String = env.get_string(&status_filter).unwrap().into();
+        if status_str.is_empty() {
+            None
+        } else {
+            Some(status_str)
+        }
+    };
+
+    let result = list_payments_impl(user_id, limit_opt, offset_opt, status_filter_opt);
     env.new_string(result).unwrap().into_raw()
 }
 
@@ -750,13 +763,26 @@ pub extern "C" fn wallet_list_payments(
     user_id: *const c_char,
     limit: i32,
     offset: i32,
+    status_filter: *const c_char,
 ) -> *mut c_char {
     let user_id = unsafe { CStr::from_ptr(user_id).to_str().unwrap() }.to_string();
 
     let limit_opt = if limit > 0 { Some(limit as usize) } else { None };
     let offset_opt = if offset > 0 { Some(offset as usize) } else { None };
 
-    let result = list_payments_impl(user_id, limit_opt, offset_opt);
+    // Parse status filter - empty string means no filter
+    let status_filter_opt = if status_filter.is_null() {
+        None
+    } else {
+        let status_str = unsafe { CStr::from_ptr(status_filter).to_str().unwrap() }.to_string();
+        if status_str.is_empty() {
+            None
+        } else {
+            Some(status_str)
+        }
+    };
+
+    let result = list_payments_impl(user_id, limit_opt, offset_opt, status_filter_opt);
     CString::new(result).unwrap().into_raw()
 }
 

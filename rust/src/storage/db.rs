@@ -217,6 +217,7 @@ impl Database {
         &self,
         limit: Option<usize>,
         offset: Option<usize>,
+        status_filter: Option<String>,
     ) -> Result<Vec<Payment>, DatabaseError> {
         let conn = self.conn.lock()
             .map_err(|e| DatabaseError::Lock(format!("{}", e)))?;
@@ -224,8 +225,15 @@ impl Database {
         let mut query = String::from(
             "SELECT id, payment_hash, payment_type, amount_sats, fee_sats, status,
                     timestamp, description, destination, txid, preimage, bolt11
-             FROM payments ORDER BY timestamp DESC"
+             FROM payments"
         );
+
+        // Add WHERE clause for status filter
+        if let Some(status) = &status_filter {
+            query.push_str(&format!(" WHERE status = '{}'", status));
+        }
+
+        query.push_str(" ORDER BY timestamp DESC");
 
         if let Some(limit) = limit {
             query.push_str(&format!(" LIMIT {}", limit));
@@ -322,7 +330,7 @@ mod tests {
             db.insert_payment(&payment).unwrap();
         }
 
-        let payments = db.list_payments(Some(3), Some(0)).unwrap();
+        let payments = db.list_payments(Some(3), Some(0), None).unwrap();
         assert_eq!(payments.len(), 3);
 
         // Should be ordered by timestamp descending

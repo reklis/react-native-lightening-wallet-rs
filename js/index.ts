@@ -177,14 +177,15 @@ export class LighteningWalletAPI {
   /**
    * List payment history
    */
-  async listPayments(limit?: number, offset?: number): Promise<Payment[]> {
+  async listPayments(limit?: number, offset?: number, statusFilter?: string): Promise<Payment[]> {
     if (!this.userId) {
       throw new Error('Wallet not initialized');
     }
     const result = await LighteningWallet.listPayments(
       this.userId,
       limit || 0,
-      offset || 0
+      offset || 0,
+      statusFilter || ''
     );
     return parseResponse<Payment[]>(result);
   }
