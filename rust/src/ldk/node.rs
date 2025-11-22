@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use std::str::FromStr;
 use ldk_node::{Builder, Node as LdkNode};
-use ldk_node::config::{Config, AnchorChannelsConfig};
+use ldk_node::config::Config;
 use ldk_node::bitcoin::{Network, Address as BdkAddress};
 use ldk_node::bitcoin::secp256k1::PublicKey;
 use ldk_node::lightning::ln::msgs::SocketAddress;
@@ -63,14 +63,11 @@ impl LightningNode {
             }
         ]);
 
-        // Enable anchor channels with default settings
-        // This solves the high commitment transaction fee reserve problem on testnet
-        config.anchor_channels_config = Some(AnchorChannelsConfig {
-            trusted_peers_no_reserve: vec![],
-            per_channel_reserve_sats: 25000, // Default reserve for anchor channels
-        });
+        // Disable anchor channels - use static remote key channels instead
+        // Anchor channels create small uneconomical outputs that can't be swept
+        config.anchor_channels_config = None;
 
-        eprintln!("[LDK INIT] Anchor channels config set: {:?}", config.anchor_channels_config.is_some());
+        eprintln!("[LDK INIT] Using static remote key channels (anchor channels disabled)");
         eprintln!("[LDK INIT] Network: {:?}", config.network);
 
         // Build the node using the config
