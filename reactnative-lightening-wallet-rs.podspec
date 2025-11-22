@@ -14,6 +14,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/elementfm/reactnative-lightening-wallet-rs.git", :tag => "#{s.version}" }
 
   s.source_files = "ios/**/*.{h,m,mm,swift}"
+  s.public_header_files = "ios/LighteningWallet-Bridging-Header.h"
   s.swift_version = "5.0"
 
   # Vendored frameworks (will contain the compiled Rust library)
@@ -24,8 +25,7 @@ Pod::Spec.new do |s|
 
   # Build settings
   s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'NO',
-    'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_TARGET_SRCROOT)/ios/LighteningWallet-Bridging-Header.h',
+    'DEFINES_MODULE' => 'YES',
     'LIBRARY_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/ios/lib'
   }
 
