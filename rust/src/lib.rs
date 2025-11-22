@@ -112,8 +112,11 @@ fn get_balance_impl(user_id: String) -> String {
         match lightning_node.get_all_balances() {
             Ok((total_onchain, spendable_onchain, pending_broadcast, broadcast_awaiting, awaiting_threshold, lightning_balance)) => {
                 // Calculate totals
+                // NOTE: awaiting_threshold outputs are ALREADY in total_onchain (they're confirmed)
+                // Only add pending_broadcast and broadcast_awaiting to avoid double-counting
                 let pending_sweep_total = pending_broadcast + broadcast_awaiting + awaiting_threshold;
-                let total_with_pending = total_onchain + pending_sweep_total;
+                let pending_sweep_not_yet_confirmed = pending_broadcast + broadcast_awaiting;
+                let total_with_pending = total_onchain + pending_sweep_not_yet_confirmed;
 
                 let balances = json!({
                     "onchain_confirmed": spendable_onchain,
