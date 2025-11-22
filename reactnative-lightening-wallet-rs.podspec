@@ -24,7 +24,7 @@ Pod::Spec.new do |s|
 
   # Build settings
   s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
+    'DEFINES_MODULE' => 'NO',
     'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_TARGET_SRCROOT)/ios/LighteningWallet-Bridging-Header.h',
     'LIBRARY_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/ios/lib'
   }
