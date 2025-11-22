@@ -1868,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "reactnative-lightening-wallet"
-version = "0.1.36"
+version = "0.1.37"
 dependencies = [
  "anyhow",
  "bip39",
