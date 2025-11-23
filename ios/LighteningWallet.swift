@@ -1,18 +1,8 @@
 import Foundation
+import React
 
 @objc(LighteningWallet)
 class LighteningWallet: NSObject {
-
-    // MARK: - Native C Functions (imported from Rust via bridging header)
-
-    // MARK: - Helper Methods
-
-    private func stringFromCString(_ cString: UnsafeMutablePointer<CChar>?) -> String? {
-        guard let cString = cString else { return nil }
-        let string = String(cString: cString)
-        wallet_free_string(cString)
-        return string
-    }
 
     // MARK: - React Native Methods
 
@@ -25,22 +15,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                mnemonic.withCString { mnemonicPtr in
-                    network.withCString { networkPtr in
-                        dbPath.withCString { dbPathPtr in
-                            self.wallet_initialize(userIdPtr, mnemonicPtr, networkPtr, dbPathPtr)
-                        }
-                    }
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.initialize(userId, mnemonic: mnemonic, network: network, dbPath: dbPath) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -55,14 +33,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = self.wallet_generate_mnemonic()
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.generateMnemonic() {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -78,16 +52,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_get_balance(userIdPtr)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.getBalance(userId) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -103,16 +71,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_sync(userIdPtr)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.sync(userId) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -128,16 +90,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_get_receiving_address(userIdPtr)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.getReceivingAddress(userId) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -155,16 +111,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_list_payments(userIdPtr, limit, offset)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.listPayments(userId, limit: limit, offset: offset) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -180,16 +130,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_get_events(userIdPtr)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.getEvents(userId) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -205,16 +149,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_disconnect(userIdPtr)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.disconnect(userId) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -233,18 +171,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                description.withCString { descPtr in
-                    self.wallet_create_invoice(userIdPtr, amountSats, descPtr, expirySecs)
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.createInvoice(userId, amountSats: UInt64(amountSats), description: description, expirySecs: UInt32(expirySecs)) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -262,18 +192,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                bolt11.withCString { bolt11Ptr in
-                    self.wallet_pay_invoice(userIdPtr, bolt11Ptr, amountSats)
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.payInvoice(userId, bolt11: bolt11, amountSats: UInt64(amountSats)) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -292,20 +214,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                destinationPubkey.withCString { pubkeyPtr in
-                    customRecordsJson.withCString { recordsPtr in
-                        self.wallet_send_keysend(userIdPtr, pubkeyPtr, amountSats, recordsPtr)
-                    }
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.sendKeysend(userId, pubkey: destinationPubkey, amountSats: UInt64(amountSats), customRecords: customRecordsJson) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -326,20 +238,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                counterpartyNodeId.withCString { nodeIdPtr in
-                    peerAddress.withCString { addressPtr in
-                        self.wallet_open_channel(userIdPtr, nodeIdPtr, channelValueSatoshis, pushMsat, addressPtr, peerPort)
-                    }
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.openChannel(userId, nodeId: counterpartyNodeId, channelValueSatoshis: UInt64(channelValueSatoshis), pushMsat: UInt64(pushMsat), address: peerAddress, peerPort: UInt16(peerPort)) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -357,18 +259,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                channelId.withCString { channelIdPtr in
-                    self.wallet_close_channel(userIdPtr, channelIdPtr, force)
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.closeChannel(userId, channelId: channelId, force: force) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -384,16 +278,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                self.wallet_list_channels(userIdPtr)
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.listChannels(userId) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
@@ -412,20 +300,10 @@ class LighteningWallet: NSObject {
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            let result = userId.withCString { userIdPtr in
-                nodeId.withCString { nodeIdPtr in
-                    address.withCString { addressPtr in
-                        self.wallet_connect_peer(userIdPtr, nodeIdPtr, addressPtr, port)
-                    }
-                }
-            }
-
-            if let jsonString = self.stringFromCString(result) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let result = LighteningWalletBridge.connectPeer(userId, nodeId: nodeId, address: address, port: UInt16(port)) {
                 DispatchQueue.main.async {
-                    resolve(jsonString)
+                    resolve(result)
                 }
             } else {
                 DispatchQueue.main.async {
