@@ -27,8 +27,11 @@ cargo build --release --target aarch64-apple-ios-sim
 echo "Building for iOS device (aarch64)..."
 cargo build --release --target aarch64-apple-ios
 
-# Create output directory
+# Create output directories for XCFramework
+# XCFramework requires libraries in each slice to have the SAME name
 mkdir -p ../ios/lib
+mkdir -p ../ios/xcframework-sim
+mkdir -p ../ios/xcframework-device
 
 # Create universal library for simulator
 echo "Creating universal simulator library..."
@@ -42,6 +45,14 @@ echo "Copying device library..."
 cp target/aarch64-apple-ios/release/libreactnative_lightening_wallet.a \
   ../ios/lib/libreactnative_lightening_wallet_device.a
 
+# Copy libraries with consistent names for XCFramework
+# CocoaPods requires the library names to match across all slices
+echo "Preparing libraries for XCFramework..."
+cp ../ios/lib/libreactnative_lightening_wallet_sim.a \
+  ../ios/xcframework-sim/libreactnative_lightening_wallet.a
+cp ../ios/lib/libreactnative_lightening_wallet_device.a \
+  ../ios/xcframework-device/libreactnative_lightening_wallet.a
+
 # Create XCFramework (optional, for better distribution)
 echo "Creating XCFramework..."
 if [ -d "../ios/LighteningWallet.xcframework" ]; then
@@ -49,9 +60,12 @@ if [ -d "../ios/LighteningWallet.xcframework" ]; then
 fi
 
 xcodebuild -create-xcframework \
-  -library ../ios/lib/libreactnative_lightening_wallet_sim.a \
-  -library ../ios/lib/libreactnative_lightening_wallet_device.a \
+  -library ../ios/xcframework-sim/libreactnative_lightening_wallet.a \
+  -library ../ios/xcframework-device/libreactnative_lightening_wallet.a \
   -output ../ios/LighteningWallet.xcframework
+
+# Clean up temp directories
+rm -rf ../ios/xcframework-sim ../ios/xcframework-device
 
 # For development, create a symlink to simulator library
 echo "Creating development library symlink..."
