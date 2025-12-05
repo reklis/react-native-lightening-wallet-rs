@@ -16,16 +16,15 @@ Pod::Spec.new do |s|
   s.source_files = "ios/**/*.{h,m,mm,swift}"
   s.swift_version = "5.0"
 
-  # Vendored frameworks (will contain the compiled Rust library)
-  s.vendored_libraries = "ios/lib/libreactnative_lightening_wallet.a"
+  # Vendored XCFramework (contains both device and simulator slices)
+  s.vendored_frameworks = "ios/LighteningWallet.xcframework"
 
   # React Native dependencies
   s.dependency "React-Core"
 
   # Build settings
   s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
-    'LIBRARY_SEARCH_PATHS' => '$(PODS_TARGET_SRCROOT)/ios/lib'
+    'DEFINES_MODULE' => 'YES'
   }
 
   # Note: Pre-built iOS libraries are included in the npm package.
